@@ -1,0 +1,2464 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Solar System Generator</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { background: #000; overflow: hidden; font-family: monospace; color: #ccc; }
+    #canvas-container { position: fixed; inset: 0; }
+
+    #topbar {
+      position: fixed;
+      top: 0; left: 0; right: 0;
+      height: 44px;
+      background: rgba(0,0,0,0.85);
+      border-bottom: 1px solid #1a1a2e;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 0 14px;
+      z-index: 10;
+    }
+    #topbar h1 { font-size: 12px; color: #556; white-space: nowrap; }
+
+    .ctrl-label { font-size: 10px; color: #556; text-transform: uppercase; letter-spacing: 1px; }
+
+    input[type=number] {
+      background: #0a0a14;
+      border: 1px solid #223;
+      color: #aac;
+      padding: 3px 6px;
+      border-radius: 3px;
+      font-family: monospace;
+      font-size: 12px;
+      width: 72px;
+    }
+    input[type=range] { accent-color: #4a8af4; width: 70px; }
+
+    .btn {
+      background: #0a0a14;
+      border: 1px solid #223;
+      color: #778;
+      padding: 4px 10px;
+      border-radius: 4px;
+      font-family: monospace;
+      font-size: 11px;
+      cursor: pointer;
+      white-space: nowrap;
+      transition: background 0.12s, color 0.12s;
+    }
+    .btn:hover { background: #111830; color: #aac; }
+    .btn.active { background: #1a2a5a; color: #6af; border-color: #346; }
+
+    #sidebar {
+      position: fixed;
+      top: 54px; right: 0;
+      width: 170px;
+      background: rgba(0,0,0,0.82);
+      border-left: 1px solid #1a1a2e;
+      padding: 10px 12px;
+      z-index: 10;
+      font-size: 11px;
+    }
+    #sidebar h2 { color: #445; font-size: 10px; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px; }
+    .planet-entry {
+      display: flex; align-items: center; gap: 7px;
+      margin-bottom: 5px; cursor: pointer; padding: 2px 0;
+    }
+    .planet-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+    .planet-entry:hover .pname { color: #ccf; }
+    .pname { color: #778; }
+    .ptype { color: #445; margin-left: 2px; }
+    .planet-entry.locked { background: rgba(60,80,160,0.25); border-radius: 3px; padding: 2px 4px; margin: 0 -4px 3px; }
+    .planet-entry.locked .pname { color: #aaf; }
+
+    #hint {
+      position: fixed;
+      bottom: 8px; left: 10px;
+      font-size: 10px; color: #334;
+    }
+
+    #orbit-panel {
+      position: fixed;
+      bottom: 30px; right: 190px;
+      background: rgba(0,0,0,0.93);
+      border: 1px solid #1a2a5a;
+      border-radius: 6px;
+      padding: 12px 14px;
+      z-index: 20;
+      width: 320px;
+      font-size: 11px;
+    }
+    .op-header { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 9px; }
+    #orbit-panel h3 { color: #4af; font-size: 11px; letter-spacing: 1px; text-transform: uppercase; margin: 0; }
+    .op-close {
+      background: none; border: 1px solid #334; color: #556;
+      padding: 2px 8px; cursor: pointer; border-radius: 3px;
+      font-size: 10px; font-family: monospace;
+    }
+    .op-close:hover { color: #aac; border-color: #446; }
+    .op-table { width: 100%; border-collapse: collapse; margin-bottom: 7px; }
+    .op-table th { color: #334; font-size: 9px; text-transform: uppercase; letter-spacing: 1px;
+      padding-bottom: 3px; font-weight: normal; text-align: right; }
+    .op-table th:first-child { text-align: left; }
+    .op-table td { padding: 2px 0; vertical-align: middle; }
+    .op-table td:first-child { color: #556; width: 34%; }
+    .op-table td:nth-child(2) { color: #667; text-align: right; padding-right: 7px; white-space: nowrap; font-size:10px; }
+    .op-table td:nth-child(3) { width: 38%; }
+    .op-table td:nth-child(3) input[type=range] { width: 100%; accent-color: #4a8af4; margin: 0; height: 14px; }
+    .op-table td:nth-child(4) { color: #aac; text-align: right; white-space: nowrap; padding-left: 5px; font-size:10px; }
+    .op-derived {
+      display: grid; grid-template-columns: auto 1fr auto 6px auto;
+      gap: 2px 5px; align-items: center;
+      padding: 5px 0; border-top: 1px solid #1a2a5a; border-bottom: 1px solid #1a2a5a;
+      margin-bottom: 7px; font-size: 10px;
+    }
+    .op-derived .lbl  { color: #556; }
+    .op-derived .cur  { color: #667; text-align: right; }
+    .op-derived .arr  { color: #334; text-align: center; }
+    .op-derived .tgt  { color: #aac; }
+    .op-cost-block { margin-bottom: 9px; }
+    .op-cost-row { display: flex; justify-content: space-between; padding: 2px 0; font-size:10px; color:#556; }
+    .op-cost-row span { font-family: monospace; }
+    .op-bar-wrap { height: 4px; background: #112; border-radius: 2px; display: flex; margin-top: 4px; overflow: hidden; }
+    #op-bar-used { height: 100%; background: #4a8af4; transition: width 0.15s; }
+    #op-bar-cost { height: 100%; background: #f55; opacity: 0.85; transition: width 0.15s; }
+    .op-footer { display: flex; justify-content: flex-end; }
+    .rocket-tag {
+      font-size: 9px; color: #4af; border: 1px solid #24a;
+      padding: 1px 3px; border-radius: 2px; margin-left: 4px; flex-shrink: 0;
+    }
+    .home-tag {
+      font-size: 9px; color: #fa6; border: 1px solid #a62;
+      padding: 1px 3px; border-radius: 2px; margin-left: 4px; flex-shrink: 0;
+      cursor: pointer;
+    }
+    .home-tag:hover { background: #1a0e05; color: #fc8; }
+    .op-soi-divider { height: 1px; background: #1a2a5a; margin: 9px 0 7px; }
+    .op-soi-header { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 5px; }
+    .op-soi-name { color: #fa8; font-size: 10px; text-transform: uppercase; letter-spacing: 0.5px; font-weight: bold; }
+    .op-soi-dist { color: #445; font-size: 10px; }
+    .op-soi-row { display: flex; justify-content: space-between; font-size: 10px; color: #556; padding: 1px 0; }
+    .op-soi-row span:last-child { color: #aac; font-family: monospace; }
+    .op-capture-wrap { display: flex; justify-content: flex-end; margin-top: 7px; }
+  </style>
+</head>
+<body>
+<div id="canvas-container"></div>
+
+<div id="topbar">
+  <h1>Solar System</h1>
+  <span class="ctrl-label">Seed</span>
+  <input type="number" id="seed-input" value="42" min="0" max="999999">
+  <span class="ctrl-label">Planets</span>
+  <input type="range" id="planet-count" min="2" max="10" step="1" value="6">
+  <span id="planet-count-val" style="font-size:11px;color:#556;min-width:12px">6</span>
+  <button class="btn" id="btn-generate">Generate</button>
+  <button class="btn" id="btn-random">Random Seed</button>
+  <button class="btn active" id="btn-orbits">Orbits: ON</button>
+  <button class="btn" id="btn-asteroid">Asteroid Belt</button>
+  <button class="btn active" id="btn-corona">Corona: ON</button>
+  <span style="width:1px;background:#1a1a2e;align-self:stretch;margin:6px 2px"></span>
+  <button class="btn" id="btn-slower">−</button>
+  <span id="sim-speed-label" style="font-size:11px;color:#aac;min-width:34px;text-align:center">1×</span>
+  <button class="btn" id="btn-faster">+</button>
+  <button class="btn" id="btn-pause">⏸</button>
+</div>
+
+<div id="sidebar">
+  <h2>Bodies</h2>
+  <div id="planet-entries"></div>
+</div>
+
+<div id="hint">Drag · Scroll to zoom · Click planet to lock camera · Click again or Star to unlock · Click HOME or SAT planet to open rocket panel</div>
+
+<div id="orbit-panel" style="display:none">
+  <div class="op-header">
+    <h3>Rocket orbit — <span id="op-planet"></span></h3>
+    <button class="op-close" id="op-close">close</button>
+  </div>
+
+  <div id="op-no-rocket" style="display:none;padding:10px 0 4px">
+    <p style="color:#556;font-size:11px;margin-bottom:10px">No satellite in orbit. Build one to begin exploring.</p>
+    <div style="display:flex;justify-content:flex-end">
+      <button class="btn" id="op-spawn">Launch Rocket</button>
+    </div>
+  </div>
+
+  <div id="op-rocket-content">
+  <table class="op-table">
+    <thead><tr><th>Element</th><th>Current</th><th>Target</th><th></th></tr></thead>
+    <tbody>
+      <tr>
+        <td>Semi-major axis</td>
+        <td id="op-sma-cur"></td>
+        <td><input type="range" id="sl-sma" step="0.1"></td>
+        <td id="op-sma-val"></td>
+      </tr>
+      <tr>
+        <td>Eccentricity</td>
+        <td id="op-ecc-cur"></td>
+        <td><input type="range" id="sl-ecc" min="0" step="0.001"></td>
+        <td id="op-ecc-val"></td>
+      </tr>
+      <tr>
+        <td>Inclination</td>
+        <td id="op-inc-cur"></td>
+        <td><input type="range" id="sl-inc" min="-90" max="90" step="0.5"></td>
+        <td id="op-inc-val"></td>
+      </tr>
+      <tr>
+        <td>Arg. periapsis</td>
+        <td id="op-arg-cur"></td>
+        <td><input type="range" id="sl-arg" min="0" max="360" step="1"></td>
+        <td id="op-arg-val"></td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="op-derived">
+    <span class="lbl">Apogee alt.</span>
+    <span class="cur" id="op-apo-cur"></span>
+    <span class="arr">→</span>
+    <span></span>
+    <span class="tgt" id="op-apo-new"></span>
+    <span class="lbl">Perigee alt.</span>
+    <span class="cur" id="op-per-cur"></span>
+    <span class="arr">→</span>
+    <span></span>
+    <span class="tgt" id="op-per-new"></span>
+  </div>
+
+  <div class="op-cost-block">
+    <div class="op-cost-row"><span>Maneuver cost</span><span id="op-cost"></span></div>
+    <div class="op-cost-row"><span>Delta-V remaining</span><span id="op-budget"></span></div>
+    <div class="op-bar-wrap"><div id="op-bar-used"></div><div id="op-bar-cost"></div></div>
+  </div>
+
+  <div class="op-footer">
+    <button class="btn" id="op-execute">Execute burn</button>
+  </div>
+
+  <div id="op-transfer-section">
+    <div class="op-soi-divider"></div>
+    <div class="op-soi-header">
+      <span class="op-soi-name">Interplanetary Transfer</span>
+    </div>
+    <select id="op-transfer-target" style="width:100%;background:#0a0a14;border:1px solid #223;color:#778;padding:3px 5px;font-family:monospace;font-size:11px;border-radius:3px;margin-bottom:6px;">
+      <option value="">— select destination —</option>
+    </select>
+    <div id="op-transfer-info" style="display:none">
+      <div class="op-soi-row"><span>Transfer time</span><span id="op-xfer-time"></span></div>
+      <div class="op-soi-row"><span>Δv departure</span><span id="op-xfer-dv1"></span></div>
+      <div class="op-soi-row"><span>Δv arrival</span><span id="op-xfer-dv2"></span></div>
+      <div class="op-soi-row"><span>Total Δv</span><span id="op-xfer-dvtotal"></span></div>
+      <div class="op-soi-divider" style="margin:5px 0 4px"></div>
+      <div class="op-soi-row"><span>Phase: cur → need</span><span id="op-xfer-phase"></span></div>
+      <div class="op-soi-row"><span>Launch window</span><span id="op-xfer-window"></span></div>
+      <div style="display:flex;gap:5px;justify-content:flex-end;margin-top:6px;">
+        <button class="btn" id="op-xfer-skip">▶▶ Skip to Window</button>
+        <button class="btn" id="op-xfer-execute" disabled style="opacity:0.35">Execute Transfer</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="op-soi-section" style="display:none">
+    <div class="op-soi-divider"></div>
+    <div class="op-soi-header">
+      <span class="op-soi-name" id="op-soi-name">—</span>
+      <span class="op-soi-dist" id="op-soi-dist"></span>
+    </div>
+    <div class="op-soi-row"><span>Eccentricity</span><span id="op-soi-ecc"></span></div>
+    <div class="op-soi-row"><span>Periapsis alt.</span><span id="op-soi-per"></span></div>
+    <div class="op-soi-row" id="op-soi-apo-row"><span>Apoapsis alt.</span><span id="op-soi-apo"></span></div>
+    <div class="op-soi-row"><span>Capture Δv</span><span id="op-soi-capv"></span></div>
+    <div class="op-capture-wrap">
+      <button class="btn" id="op-capture">Capture at periapsis</button>
+    </div>
+  </div>
+  </div><!-- /op-rocket-content -->
+
+  <div id="op-mission-section" style="display:none">
+    <div class="op-soi-divider"></div>
+    <div class="op-soi-header">
+      <span class="op-soi-name">Mission Queue</span>
+    </div>
+    <div style="display:flex;gap:4px;align-items:center;margin-bottom:6px">
+      <select id="op-mission-dest" style="flex:1;background:#0a0a14;border:1px solid #223;color:#778;padding:2px 4px;font-family:monospace;font-size:11px;border-radius:3px">
+        <option value="">— destination —</option>
+      </select>
+      <input type="number" id="op-mission-count" value="1" min="1" max="20"
+             style="width:38px;background:#0a0a14;border:1px solid #223;color:#aac;padding:2px 4px;font-family:monospace;font-size:11px;border-radius:3px;text-align:center">
+      <button class="btn" id="op-mission-queue">Queue</button>
+    </div>
+    <div id="op-mission-list" style="font-size:10px;color:#556"></div>
+  </div>
+</div>
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+  }
+}
+</script>
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+// ── Renderer ──────────────────────────────────────────────
+const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 1.5));
+renderer.setSize(innerWidth, innerHeight);
+document.getElementById('canvas-container').appendChild(renderer.domElement);
+
+// ── Scene / Camera ────────────────────────────────────────
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x00000d);
+
+const camera = new THREE.PerspectiveCamera(55, innerWidth / innerHeight, 0.1, 60000);
+camera.position.set(0, 100, 240);
+
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true;
+controls.dampingFactor = 0.07;
+controls.minDistance = 5;
+controls.maxDistance = 8000;
+
+const clock = new THREE.Clock();
+
+// ── Seeded RNG (Mulberry32) ───────────────────────────────
+function makeRng(seed) {
+  let s = seed >>> 0;
+  return () => {
+    s |= 0; s = s + 0x6D2B79F5 | 0;
+    let t = Math.imul(s ^ s >>> 15, 1 | s);
+    t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+    return ((t ^ t >>> 14) >>> 0) / 4294967296;
+  };
+}
+function rr(rng, lo, hi) { return lo + rng() * (hi - lo); }
+function ri(rng, lo, hi) { return lo + Math.floor(rng() * (hi - lo + 1 - 1e-9)); }
+
+// ── Gas planet texture (from cities.obj) ─────────────────
+function _makePlanetTex(hue) {
+  const S = 256;
+  const c = document.createElement('canvas');
+  c.width = c.height = S;
+  const ctx = c.getContext('2d');
+  const col = (h, s, l, a = 1) => `hsla(${(h % 1) * 360},${s}%,${l}%,${a})`;
+  ctx.fillStyle = col(hue, 65, 42);
+  ctx.fillRect(0, 0, S, S);
+  const bands = 6 + Math.floor(Math.random() * 6);
+  for (let i = 0; i < bands; i++) {
+    const y = (i / bands) * S;
+    const bh = S / bands * (0.4 + Math.random() * 0.8);
+    const dh = (Math.random() - 0.5) * 0.15;
+    const dl = 30 + Math.random() * 40;
+    const grad = ctx.createLinearGradient(0, y, 0, y + bh);
+    grad.addColorStop(0,   col(hue + dh, 70, dl, 0));
+    grad.addColorStop(0.5, col(hue + dh, 70, dl, 0.85));
+    grad.addColorStop(1,   col(hue + dh, 70, dl, 0));
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, y, S, bh);
+  }
+  const hBands = 3 + Math.floor(Math.random() * 4);
+  for (let i = 0; i < hBands; i++) {
+    const y = Math.random() * S;
+    const bh = 8 + Math.random() * 20;
+    const dh = 0.08 + Math.random() * 0.18;
+    const grad = ctx.createLinearGradient(0, y, 0, y + bh);
+    grad.addColorStop(0,   col(hue + dh, 80, 78, 0));
+    grad.addColorStop(0.5, col(hue + dh, 80, 78, 0.28));
+    grad.addColorStop(1,   col(hue + dh, 80, 78, 0));
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, y, S, bh);
+  }
+  for (let y = 0; y < S; y += 3) {
+    const amp = 4 + Math.random() * 8;
+    const periods = 2 + Math.floor(Math.random() * 5);
+    const freq = periods / S;
+    ctx.beginPath();
+    for (let x = 0; x <= S; x++) {
+      const yy = y + Math.sin(x * freq * Math.PI * 2) * amp;
+      x === 0 ? ctx.moveTo(x, yy) : ctx.lineTo(x, yy);
+    }
+    ctx.strokeStyle = col(hue + (Math.random() - 0.5) * 0.1, 60, 55 + Math.random() * 20, 0.32);
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+  }
+  const cloudRows = 18 + Math.floor(Math.random() * 12);
+  for (let i = 0; i < cloudRows; i++) {
+    const cy = Math.random() * S;
+    const blobs = 6 + Math.floor(Math.random() * 10);
+    for (let j = 0; j < blobs; j++) {
+      const cx = Math.random() * S;
+      const r  = 3 + Math.random() * 9;
+      const g  = ctx.createRadialGradient(cx, cy, 0, cx, cy, r);
+      g.addColorStop(0, `rgba(255,255,255,${0.06 + Math.random() * 0.10})`);
+      g.addColorStop(1, 'rgba(255,255,255,0)');
+      ctx.fillStyle = g;
+      ctx.fillRect(cx - r, cy - r, r * 2, r * 2);
+    }
+  }
+  const pg = ctx.createRadialGradient(S / 2, 4, 0, S / 2, 4, S * 0.38);
+  pg.addColorStop(0, 'rgba(255,255,255,0.55)');
+  pg.addColorStop(1, 'rgba(255,255,255,0)');
+  ctx.fillStyle = pg;
+  ctx.fillRect(0, 0, S, S);
+  return new THREE.CanvasTexture(c);
+}
+
+// ── Gas planet v2 — pixel-band + storm ovals ─────────────
+// Palette presets: each gives a distinct gas-giant personality
+const _GAS2_PALETTES = [
+  { name:'jovian',  base:[210,155, 90], vary:[50,35,20] },  // Jupiter tans/oranges
+  { name:'storm',   base:[ 90,100,160], vary:[40,40,30] },  // Neptune blue-grey
+  { name:'sulfur',  base:[200,180, 60], vary:[55,40,15] },  // sulphurous yellow
+  { name:'crimson', base:[170, 55, 45], vary:[45,30,20] },  // deep red giant
+  { name:'jade',    base:[ 60,140, 90], vary:[30,45,25] },  // pale green
+];
+function _makeGasTex(seed) {
+  const S = 512;
+  const canvas = document.createElement('canvas');
+  canvas.width = canvas.height = S;
+  const ctx = canvas.getContext('2d');
+  let _s = seed | 0;  // local seeded rng so texture is reproducible
+  const r = () => { _s=(_s*1664525+1013904223)&0xffffffff; return (_s>>>0)/0xffffffff; };
+
+  const pal = _GAS2_PALETTES[Math.floor(r() * _GAS2_PALETTES.length)];
+  const [br,bg,bb] = pal.base, [vr,vg,vb] = pal.vary;
+  const clp = v => Math.min(255, Math.max(0, Math.round(v)));
+
+  ctx.fillStyle = `rgb(${br},${bg},${bb})`;
+  ctx.fillRect(0, 0, S, S);
+
+  // pixel-row bands — two overlapping sine waves per row
+  const f1 = 0.025 + r()*0.035, f2 = 0.008 + r()*0.012;
+  const p1 = r()*Math.PI*2,     p2 = r()*Math.PI*2;
+  const imageData = ctx.createImageData(S, S);
+  for (let y = 0; y < S; y++) {
+    const wave = Math.sin(y*f1 + p1)*0.6 + Math.sin(y*f2 + p2)*0.4;
+    const rr = clp(br + wave*vr + (r()-0.5)*12);
+    const gg = clp(bg + wave*vg + (r()-0.5)*10);
+    const bb2= clp(bb + wave*vb + (r()-0.5)* 8);
+    for (let x = 0; x < S; x++) {
+      const i = (y*S + x)*4;
+      imageData.data[i]   = rr;
+      imageData.data[i+1] = gg;
+      imageData.data[i+2] = bb2;
+      imageData.data[i+3] = 255;
+    }
+  }
+  ctx.putImageData(imageData, 0, 0);
+
+  // fine turbulence streaks
+  for (let i = 0; i < 60; i++) {
+    const y0 = r()*S, amp = 3+r()*9, freq = (2+Math.floor(r()*5))/S;
+    ctx.beginPath();
+    for (let x = 0; x <= S; x++) {
+      const y = y0 + Math.sin(x*freq*Math.PI*2)*amp;
+      x===0 ? ctx.moveTo(x,y) : ctx.lineTo(x,y);
+    }
+    const bright = r()<0.5 ? 30 : -25;
+    ctx.strokeStyle = `rgba(${clp(br+bright)},${clp(bg+bright)},${clp(bb+bright)},${0.18+r()*0.22})`;
+    ctx.lineWidth = 0.8 + r()*1.8;
+    ctx.stroke();
+  }
+
+  // storm ovals with bright eye
+  const storms = 1 + Math.floor(r()*4);
+  for (let i = 0; i < storms; i++) {
+    const sx=r()*S, sy=r()*S, sw=20+r()*80, sh=10+r()*35;
+    ctx.save(); ctx.translate(sx,sy); ctx.scale(1, sh/sw);
+    const g = ctx.createRadialGradient(0,0,0, 0,0,sw);
+    const sr = clp(br+(r()-0.5)*100), sg = clp(bg+(r()-0.5)*80), sb2 = clp(bb+(r()-0.5)*70);
+    g.addColorStop(0,   `rgba(${sr},${sg},${sb2},0.75)`);
+    g.addColorStop(0.5, `rgba(${sr},${sg},${sb2},0.35)`);
+    g.addColorStop(1,   'transparent');
+    ctx.fillStyle = g;
+    ctx.beginPath(); ctx.arc(0,0,sw,0,Math.PI*2); ctx.fill();
+    const eg = ctx.createRadialGradient(0,0,0, 0,0,sw*0.28);
+    eg.addColorStop(0, `rgba(255,255,255,0.35)`);
+    eg.addColorStop(1, 'transparent');
+    ctx.fillStyle = eg;
+    ctx.beginPath(); ctx.arc(0,0,sw*0.28,0,Math.PI*2); ctx.fill();
+    ctx.restore();
+  }
+
+  // polar shimmer
+  const pg = ctx.createRadialGradient(S/2,2,0, S/2,2,S*0.32);
+  pg.addColorStop(0, 'rgba(255,255,255,0.4)');
+  pg.addColorStop(1, 'rgba(255,255,255,0)');
+  ctx.fillStyle = pg; ctx.fillRect(0,0,S,S);
+
+  return new THREE.CanvasTexture(canvas);
+}
+
+// ── Rocky planet texture with FBM noise + normal map (from cities.obj) ───
+function _makeRockyTex(hue, seed, type = 'rock') {
+  const S = 256;
+  let _s = seed | 0;
+  function rng() { _s = (_s * 1664525 + 1013904223) & 0xffffffff; return (_s >>> 0) / 0xffffffff; }
+  function hash3(ix, iy, iz) {
+    let h = (ix * 374761393 ^ iy * 668265263 ^ iz * 1013904223) + ((_s * 982451653) | 0);
+    h = ((h ^ (h >>> 13)) * 1274126177) | 0;
+    return ((h >>> 0) & 0x7fffffff) / 0x7fffffff;
+  }
+  function noise3(x, y, z) {
+    const xi = Math.floor(x), yi = Math.floor(y), zi = Math.floor(z);
+    const fx = x-xi, fy = y-yi, fz = z-zi;
+    const ux = fx*fx*(3-2*fx), uy = fy*fy*(3-2*fy), uz = fz*fz*(3-2*fz);
+    const v000=hash3(xi,yi,zi), v100=hash3(xi+1,yi,zi), v010=hash3(xi,yi+1,zi), v110=hash3(xi+1,yi+1,zi);
+    const v001=hash3(xi,yi,zi+1), v101=hash3(xi+1,yi,zi+1), v011=hash3(xi,yi+1,zi+1), v111=hash3(xi+1,yi+1,zi+1);
+    return v000*(1-ux)*(1-uy)*(1-uz)+v100*ux*(1-uy)*(1-uz)+v010*(1-ux)*uy*(1-uz)+v110*ux*uy*(1-uz)
+          +v001*(1-ux)*(1-uy)*uz+v101*ux*(1-uy)*uz+v011*(1-ux)*uy*uz+v111*ux*uy*uz;
+  }
+  function makeFbm(scale, octaves) {
+    const r = scale / (Math.PI * 2);
+    const sz = scale * 0.8;
+    return (px, py) => {
+      const cx = Math.cos(px * Math.PI * 2) * r;
+      const cy = Math.sin(px * Math.PI * 2) * r;
+      const cz = py * sz;
+      let v = 0, amp = 0.5, freq = 1, max = 0;
+      for (let o = 0; o < octaves; o++) {
+        v += noise3(cx*freq, cy*freq, cz*freq) * amp;
+        max += amp; amp *= 0.5; freq *= 2.1;
+      }
+      return v / max;
+    };
+  }
+  const scale = 8 + rng() * 5;
+  const fbm   = makeFbm(scale, 6);
+  const fbmHi = makeFbm(scale * 0.35, 3);
+  const hmap  = new Float32Array(S * S);
+  const himap = new Float32Array(S * S);
+  for (let y = 0; y < S; y++) for (let x = 0; x < S; x++) {
+    hmap[y * S + x]  = fbm(x / S, y / S);
+    himap[y * S + x] = fbmHi(x / S, y / S);
+  }
+  // normal-map strength varies by type; lava also gets an emissive map
+  const normalStrength = { black:30, ice:28, water:18, rock:32, desert:26, toxic:22, lava:45, ocean:16 }[type] ?? 32;
+
+  let col;
+  if (type === 'black') {
+    col = (h) => {
+      const t1 = Math.min(1, Math.max(0, h/0.5));
+      const t2 = Math.min(1, Math.max(0, (h-0.5)/0.5));
+      return [(0.04+t1*0.11+t2*0.14)*255, (0.04+t1*0.10+t2*0.13)*255, (0.05+t1*0.11+t2*0.15)*255];
+    };
+  } else if (type === 'ice') {
+    col = (h, hi) => {
+      const t1 = Math.min(1, Math.max(0, h/0.45));
+      const t2 = Math.min(1, Math.max(0, (h-0.45)/0.55));
+      let r=0.72+t1*0.16+t2*0.10, g=0.82+t1*0.10+t2*0.06, b=0.90+t1*0.07+t2*0.03;
+      const bloom = Math.max(0, (hi-0.58)/0.30);
+      r=r+(0.82-r)*bloom; g=g+(0.08-g)*bloom; b=b+(0.08-b)*bloom;
+      return [Math.min(255,r*255), Math.min(255,g*255), Math.min(255,b*255)];
+    };
+  } else if (type === 'water') {
+    col = (h) => {
+      let r,g,b;
+      if      (h<0.32) { const t=h/0.32;              r=0.03+t*0.07; g=0.10+t*0.22; b=0.42+t*0.22; }
+      else if (h<0.42) { const t=(h-0.32)/0.10;       r=0.10+t*0.68; g=0.32+t*0.38; b=0.64-t*0.18; }
+      else if (h<0.72) { const t=(h-0.42)/0.30;       r=0.18+t*0.16; g=0.40-t*0.06; b=0.14+t*0.10; }
+      else             { const t=Math.min(1,(h-0.72)/0.28); r=0.34+t*0.22; g=0.34+t*0.18; b=0.24+t*0.22; }
+      return [Math.min(255,r*255), Math.min(255,g*255), Math.min(255,b*255)];
+    };
+  } else if (type === 'desert') {
+    // dark basin → burnt orange plains → pale tan ridgeline → dusty peak
+    col = (h, hi) => {
+      const t1=Math.min(1,Math.max(0,h/0.38)), t2=Math.min(1,Math.max(0,(h-0.38)/0.37)), t3=Math.min(1,Math.max(0,(h-0.75)/0.25));
+      let r=0.26+t1*0.44+t2*0.18+t3*0.06;
+      let g=0.12+t1*0.28+t2*0.20+t3*0.10;
+      let b=0.05+t1*0.07+t2*0.10+t3*0.14;
+      // wind-scoured bright ridgelines from secondary noise
+      const scour=Math.max(0,(hi-0.56)/0.34);
+      r=r+(0.90-r)*scour*0.5; g=g+(0.78-g)*scour*0.5; b=b+(0.54-b)*scour*0.4;
+      return [Math.min(255,r*255), Math.min(255,g*255), Math.min(255,b*255)];
+    };
+  } else if (type === 'toxic') {
+    // dark sludge → murky green → sickly yellow-green → crystalline peaks
+    col = (h, hi) => {
+      const t1=Math.min(1,Math.max(0,h/0.36)), t2=Math.min(1,Math.max(0,(h-0.36)/0.40)), t3=Math.min(1,Math.max(0,(h-0.76)/0.24));
+      let r=0.07+t1*0.22+t2*0.32+t3*0.14;
+      let g=0.10+t1*0.38+t2*0.26+t3*0.10;
+      let b=0.03+t1*0.04+t2*0.02+t3*0.10;
+      // mineral crystal highlights from secondary noise
+      const crystal=Math.max(0,(hi-0.58)/0.32);
+      r=r+(0.72-r)*crystal*0.45; g=g+(0.92-g)*crystal*0.55; b=b+(0.22-b)*crystal*0.35;
+      return [Math.min(255,r*255), Math.min(255,g*255), Math.min(255,b*255)];
+    };
+  } else if (type === 'lava') {
+    // bright lava lakes → cooling crust → dark basalt → ancient black peaks
+    col = (h) => {
+      let r,g,b;
+      if      (h<0.26) { const t=h/0.26;             r=1.00-t*0.22; g=0.56-t*0.32; b=t*0.04; }
+      else if (h<0.48) { const t=(h-0.26)/0.22;      r=0.78-t*0.40; g=0.24-t*0.18; b=0.04-t*0.02; }
+      else if (h<0.76) { const t=(h-0.48)/0.28;      r=0.38-t*0.24; g=0.06-t*0.03; b=0.02; }
+      else             { const t=Math.min(1,(h-0.76)/0.24); r=0.14+t*0.07; g=0.03+t*0.05; b=0.02+t*0.04; }
+      return [Math.min(255,r*255), Math.min(255,g*255), Math.min(255,b*255)];
+    };
+  } else if (type === 'ocean') {
+    col = (h, hi) => {
+      let r,g,b;
+      if      (h<0.30) { const t=h/0.30;              r=0.01+t*0.01; g=0.04+t*0.07; b=0.25+t*0.17; } // abyss
+      else if (h<0.58) { const t=(h-0.30)/0.28;       r=0.02+t*0.05; g=0.11+t*0.16; b=0.42+t*0.16; } // deep
+      else if (h<0.72) { const t=(h-0.58)/0.14;       r=0.07+t*0.06; g=0.27+t*0.20; b=0.58-t*0.10; } // shallow reef
+      else if (h<0.78) { const t=(h-0.72)/0.06;       r=0.13+t*0.54; g=0.47+t*0.28; b=0.48-t*0.22; } // beach
+      else if (h<0.90) { const t=(h-0.78)/0.12;       r=0.12+t*0.08; g=0.42-t*0.04; b=0.10+t*0.04; } // island jungle
+      else             { const t=Math.min(1,(h-0.90)/0.10); r=0.20+t*0.76; g=0.38+t*0.58; b=0.14+t*0.82; } // snow peak
+      const snow=Math.max(0,(hi-0.82)/0.14);
+      r=r+(0.96-r)*snow; g=g+(0.96-g)*snow; b=b+(1.00-b)*snow;
+      return [Math.min(255,r*255), Math.min(255,g*255), Math.min(255,b*255)];
+    };
+  } else {
+    const redBias=0.5+hue*0.5;
+    const hiR=redBias*0.92+(1-redBias)*0.78, hiG=redBias*0.78+(1-redBias)*0.84, hiB=redBias*0.55+(1-redBias)*0.92;
+    col = (h, hi) => {
+      const lo={r:0.18+redBias*0.10,g:0.08,b:0.06};
+      const mid={r:0.55+redBias*0.12,g:0.22+(1-redBias)*0.10,b:0.18+(1-redBias)*0.10};
+      const hih={r:0.70+(1-redBias)*0.08,g:0.65+(1-redBias)*0.08,b:0.65+(1-redBias)*0.08};
+      const t1=Math.min(1,Math.max(0,h/0.45)), t2=Math.min(1,Math.max(0,(h-0.45)/0.55));
+      let r=lo.r+(mid.r-lo.r)*t1+(hih.r-mid.r)*t2;
+      let g=lo.g+(mid.g-lo.g)*t1+(hih.g-mid.g)*t2;
+      let b=lo.b+(mid.b-lo.b)*t1+(hih.b-mid.b)*t2;
+      const blend=Math.max(0,(hi-0.62)/0.28);
+      r=r+(hiR-r)*blend; g=g+(hiG-g)*blend; b=b+(hiB-b)*blend;
+      return [Math.min(255,r*255), Math.min(255,g*255), Math.min(255,b*255)];
+    };
+  }
+
+  const dc=document.createElement('canvas'); dc.width=dc.height=S;
+  const dctx=dc.getContext('2d'), dimg=dctx.createImageData(S,S);
+  for (let i=0;i<S*S;i++) {
+    const [r,g,b]=col(hmap[i],himap[i]);
+    dimg.data[i*4]=r; dimg.data[i*4+1]=g; dimg.data[i*4+2]=b; dimg.data[i*4+3]=255;
+  }
+  dctx.putImageData(dimg,0,0);
+
+  // normal map — Sobel-like gradient from heightmap
+  const nc=document.createElement('canvas'); nc.width=nc.height=S;
+  const nctx=nc.getContext('2d'), nimg=nctx.createImageData(S,S);
+  for (let y=0;y<S;y++) for (let x=0;x<S;x++) {
+    const xm=hmap[y*S+Math.max(0,x-1)], xp=hmap[y*S+Math.min(S-1,x+1)];
+    const ym=hmap[Math.max(0,y-1)*S+x], yp=hmap[Math.min(S-1,y+1)*S+x];
+    const dx=(xp-xm)*normalStrength, dy=(yp-ym)*normalStrength;
+    const len=Math.sqrt(dx*dx+dy*dy+1);
+    const nx=-dx/len, ny=-dy/len, nz=1/len;
+    const idx=(y*S+x)*4;
+    nimg.data[idx]=(nx*0.5+0.5)*255; nimg.data[idx+1]=(ny*0.5+0.5)*255;
+    nimg.data[idx+2]=(nz*0.5+0.5)*255; nimg.data[idx+3]=255;
+  }
+  nctx.putImageData(nimg,0,0);
+
+  // emissive map for lava — glows where h < 0.26 (the lava pools)
+  let emissiveMap = null;
+  if (type === 'lava') {
+    const ec=document.createElement('canvas'); ec.width=ec.height=S;
+    const ectx=ec.getContext('2d'), eimg=ectx.createImageData(S,S);
+    for (let i=0;i<S*S;i++) {
+      const glow=Math.max(0, 1 - hmap[i]/0.26);  // 1 at lowest point, 0 above threshold
+      const bright=glow*glow;                       // squared → concentrated in pits
+      eimg.data[i*4]  =Math.min(255,bright*255);
+      eimg.data[i*4+1]=Math.min(255,bright*0.35*255);
+      eimg.data[i*4+2]=0;
+      eimg.data[i*4+3]=255;
+    }
+    ectx.putImageData(eimg,0,0);
+    emissiveMap = new THREE.CanvasTexture(ec);
+  }
+
+  return { map: new THREE.CanvasTexture(dc), normalMap: new THREE.CanvasTexture(nc), emissiveMap };
+}
+
+// ── Planet type catalog ───────────────────────────────────
+const PLANET_CATALOG = [
+  {
+    id: 'gas',    label: 'Gas Giant',   innerWeight: 1, outerWeight: 14,
+    radiusRange: [14, 36], shininess: 20, dotColor: '#d4a050',
+    ringChance: 0.40, doomedMoonChance: 0.55, moonChance: 0.50, moonCountRange: [1, 3],
+    makeTex(rng) {
+      const h = 0.12 + rng() * 0.53;
+      return { map: _makePlanetTex(h), color: new THREE.Color().setHSL(h, 0.75, 0.58) };
+    },
+  },
+  {
+    id: 'gas',    label: 'Storm Giant', innerWeight: 1, outerWeight: 12,
+    radiusRange: [14, 36], shininess: 22, dotColor: '#c09040',
+    ringChance: 0.40, doomedMoonChance: 0.55, moonChance: 0.50, moonCountRange: [1, 3],
+    makeTex(rng) {
+      return { map: _makeGasTex(rng() * 99999), color: new THREE.Color(0.7, 0.55, 0.35) };
+    },
+  },
+  {
+    id: 'rock',   label: 'Rocky',       innerWeight: 12, outerWeight: 5,
+    radiusRange: [2, 12], shininess: 5, dotColor: '#a07850',
+    ringChance: 0.08, moonChance: 0.35,
+    makeTex(rng) {
+      const h = rng() < 0.6 ? rng() * 0.08 : 0.55 + rng() * 0.08;
+      return { ..._makeRockyTex(h, rng()*99999, 'rock'),
+               color: new THREE.Color().setHSL(h, h < 0.1 ? 0.45 : 0.10, 0.40) };
+    },
+  },
+  {
+    id: 'black',  label: 'Obsidian',    innerWeight: 7, outerWeight: 4,
+    radiusRange: [2, 12], shininess: 4, dotColor: '#445566',
+    ringChance: 0.05, moonChance: 0.20,
+    makeTex(rng) {
+      return { ..._makeRockyTex(0, rng()*99999, 'black'),
+               color: new THREE.Color(0.08, 0.08, 0.10) };
+    },
+  },
+  {
+    id: 'water',  label: 'Continental', innerWeight: 1, midWeight: 14, outerWeight: 1,
+    radiusRange: [2, 12], shininess: 80, dotColor: '#2255cc', atmColor: 0x2266ff,
+    ringChance: 0.05, moonChance: 0.40,
+    makeTex(rng) {
+      return { ..._makeRockyTex(0.6, rng()*99999, 'water'),
+               color: new THREE.Color(0.05, 0.18, 0.55) };
+    },
+  },
+  {
+    id: 'ice',    label: 'Frozen',      innerWeight: 0, outerWeight: 16,
+    radiusRange: [2, 12], shininess: 50, dotColor: '#88ccee', atmColor: 0xaaddff,
+    ringChance: 0.12, moonChance: 0.40,
+    makeTex(rng) {
+      return { ..._makeRockyTex(0, rng()*99999, 'ice'),
+               color: new THREE.Color(0.82, 0.92, 0.98) };
+    },
+  },
+  {
+    id: 'desert', label: 'Desert',      innerWeight: 13, outerWeight: 3,
+    radiusRange: [2, 12], shininess: 3, dotColor: '#cc8833',
+    ringChance: 0.08, moonChance: 0.30,
+    makeTex(rng) {
+      return { ..._makeRockyTex(0.06, rng()*99999, 'desert'),
+               color: new THREE.Color(0.72, 0.42, 0.12) };
+    },
+  },
+  {
+    id: 'lava',   label: 'Volcanic',    innerWeight: 12, outerWeight: 1,
+    radiusRange: [2, 12], shininess: 38, dotColor: '#dd3300',
+    ringChance: 0.10, moonChance: 0.25,
+    emissive: { color: new THREE.Color(1.0, 0.28, 0), intensity: 1.2 },
+    makeTex(rng) {
+      return { ..._makeRockyTex(0, rng()*99999, 'lava'),
+               color: new THREE.Color(0.20, 0.04, 0.01) };
+    },
+  },
+  {
+    id: 'toxic',  label: 'Toxic',       innerWeight: 4, outerWeight: 9,
+    radiusRange: [2, 12], shininess: 14, dotColor: '#55bb22', atmColor: 0x44cc11,
+    ringChance: 0.08, moonChance: 0.30,
+    makeTex(rng) {
+      return { ..._makeRockyTex(0.28, rng()*99999, 'toxic'),
+               color: new THREE.Color(0.18, 0.40, 0.06) };
+    },
+  },
+  {
+    id: 'ocean',  label: 'Ocean World', innerWeight: 1, midWeight: 12, outerWeight: 1,
+    radiusRange: [4, 13], shininess: 90, dotColor: '#1155cc', atmColor: 0x1144ff,
+    ringChance: 0.05, moonChance: 0.45,
+    makeTex(rng) {
+      return { ..._makeRockyTex(0.6, rng()*99999, 'ocean'),
+               color: new THREE.Color(0.03, 0.14, 0.52) };
+    },
+  },
+];
+
+function zoneWeight(e, t) {
+  if (e.midWeight !== undefined) {
+    return t < 0.5
+      ? e.innerWeight + (e.midWeight - e.innerWeight) * (t * 2)
+      : e.midWeight   + (e.outerWeight - e.midWeight) * ((t - 0.5) * 2);
+  }
+  return e.innerWeight + (e.outerWeight - e.innerWeight) * t;
+}
+
+function samplePlanetType(rng, t = 0.5) {
+  const tw = PLANET_CATALOG.reduce((s, e) => s + zoneWeight(e, t), 0);
+  let r = rng() * tw;
+  for (const e of PLANET_CATALOG) {
+    r -= zoneWeight(e, t);
+    if (r <= 0) return e;
+  }
+  return PLANET_CATALOG.at(-1);
+}
+
+// ── Star Texture ──────────────────────────────────────────
+const STAR_TYPES = [
+  { name: 'G-type', inner: '#ffffff', mid: '#fffccc', outer: '#ffaa00', light: 0xfff4aa },
+  { name: 'B-type', inner: '#ffffff', mid: '#ccddff', outer: '#4477ff', light: 0xaabbff },
+  { name: 'M-type', inner: '#ffffff', mid: '#ffddcc', outer: '#ff4400', light: 0xff8866 },
+  { name: 'F-type', inner: '#ffffff', mid: '#ffffcc', outer: '#ffcc55', light: 0xffee88 },
+];
+
+function makeStarTexture(rng) {
+  const size = 512;
+  const canvas = document.createElement('canvas');
+  canvas.width = canvas.height = size;
+  const ctx = canvas.getContext('2d');
+  const cx = size / 2;
+  const st = STAR_TYPES[ri(rng, 0, STAR_TYPES.length - 1)];
+  const g = ctx.createRadialGradient(cx, cx, 0, cx, cx, cx);
+  g.addColorStop(0,    st.inner);
+  g.addColorStop(0.25, st.mid);
+  g.addColorStop(0.65, st.outer);
+  g.addColorStop(1,    'transparent');
+  ctx.fillStyle = g; ctx.fillRect(0, 0, size, size);
+  for (let i = 0; i < 180; i++) {
+    const px = rng() * size, py = rng() * size, pr = 2 + rng() * 8;
+    ctx.fillStyle = `rgba(255,255,255,${0.04 + rng() * 0.08})`;
+    ctx.beginPath(); ctx.arc(px, py, pr, 0, Math.PI * 2); ctx.fill();
+  }
+  return { texture: new THREE.CanvasTexture(canvas), type: st };
+}
+
+// ── Starfield (background) ────────────────────────────────
+function buildStarfield() {
+  const count = 7000;
+  const pos = new Float32Array(count * 3);
+  const col = new Float32Array(count * 3);
+  const STAR_COLS = [[1,1,1],[1,0.95,0.8],[0.78,0.88,1],[1,0.7,0.55],[0.92,0.92,1]];
+  for (let i = 0; i < count; i++) {
+    const theta = Math.random() * Math.PI * 2;
+    const phi   = Math.acos(2 * Math.random() - 1);
+    const r     = 9000 + Math.random() * 3000;
+    pos[i*3]   = r * Math.sin(phi) * Math.cos(theta);
+    pos[i*3+1] = r * Math.sin(phi) * Math.sin(theta);
+    pos[i*3+2] = r * Math.cos(phi);
+    const c = STAR_COLS[Math.floor(Math.random() * STAR_COLS.length)];
+    col[i*3] = c[0]; col[i*3+1] = c[1]; col[i*3+2] = c[2];
+  }
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  geo.setAttribute('color',    new THREE.BufferAttribute(col, 3));
+  return new THREE.Points(geo, new THREE.PointsMaterial({ size: 1.8, vertexColors: true, sizeAttenuation: false }));
+}
+
+// ── Orbit Ring ────────────────────────────────────────────
+function buildOrbitRing(r) {
+  const N = 160;
+  const pts = [];
+  for (let i = 0; i <= N; i++) {
+    const a = (i / N) * Math.PI * 2;
+    pts.push(new THREE.Vector3(Math.cos(a) * r, 0, Math.sin(a) * r));
+  }
+  const geo = new THREE.BufferGeometry().setFromPoints(pts);
+  return new THREE.Line(geo, new THREE.LineBasicMaterial({ color: 0x223366, transparent: true, opacity: 0.35 }));
+}
+
+// ── Rocket mesh ───────────────────────────────────────────
+function buildRocketMesh(s) {
+  const g   = new THREE.Group();
+  const wht = new THREE.MeshPhongMaterial({ color: 0xdde0ee, shininess: 70 });
+  const gry = new THREE.MeshPhongMaterial({ color: 0x8899aa, shininess: 90 });
+  const red = new THREE.MeshPhongMaterial({ color: 0xcc2222 });
+
+  const body = new THREE.Mesh(new THREE.CylinderGeometry(s*0.12, s*0.14, s*0.65, 8), wht);
+  g.add(body);
+
+  const nose = new THREE.Mesh(new THREE.ConeGeometry(s*0.12, s*0.32, 8), wht);
+  nose.position.y = s * 0.485;
+  g.add(nose);
+
+  const bell = new THREE.Mesh(new THREE.CylinderGeometry(s*0.19, s*0.13, s*0.14, 8), gry);
+  bell.position.y = -s * 0.395;
+  g.add(bell);
+
+  for (let i = 0; i < 3; i++) {
+    const fin = new THREE.Mesh(new THREE.BoxGeometry(s*0.04, s*0.22, s*0.17), red);
+    const a = (i / 3) * Math.PI * 2;
+    fin.position.set(Math.cos(a) * s*0.12, -s*0.28, Math.sin(a) * s*0.12);
+    fin.rotation.y = a;
+    g.add(fin);
+  }
+
+  const glow = new THREE.Mesh(
+    new THREE.SphereGeometry(s*0.10, 6, 6),
+    new THREE.MeshBasicMaterial({ color: 0xff6600, transparent: true, opacity: 0.85,
+      blending: THREE.AdditiveBlending, depthWrite: false }),
+  );
+  glow.position.y = -s * 0.51;
+  g.add(glow);
+
+  return g;
+}
+
+// ── Elliptical orbit ring (XZ plane, planet at focus) ─────
+function buildEllipticalOrbitRing(a, e) {
+  const b = a * Math.sqrt(1 - e * e);
+  const c = a * e;
+  const N = 128;
+  const pts = [];
+  for (let i = 0; i <= N; i++) {
+    const theta = (i / N) * Math.PI * 2;
+    pts.push(new THREE.Vector3(a * Math.cos(theta) - c, 0, b * Math.sin(theta)));
+  }
+  return new THREE.Line(
+    new THREE.BufferGeometry().setFromPoints(pts),
+    new THREE.LineBasicMaterial({ color: 0x22aaff, transparent: true, opacity: 0.55 }),
+  );
+}
+
+// ── Saturn-style Rings ────────────────────────────────────
+function buildPlanetRings(rng, planetRadius) {
+  const inner = planetRadius * (1.35 + rng() * 0.3);
+  const outer = inner + planetRadius * (0.5 + rng() * 0.9);
+  const geo = new THREE.RingGeometry(inner, outer, 80);
+  const r = 0.5 + rng() * 0.4, g = 0.4 + rng() * 0.3, b = 0.2 + rng() * 0.2;
+  const mat = new THREE.MeshBasicMaterial({
+    color: new THREE.Color(r, g, b),
+    side: THREE.DoubleSide, transparent: true, opacity: 0.5 + rng() * 0.25,
+  });
+  const ring = new THREE.Mesh(geo, mat);
+  ring.rotation.x = Math.PI * (0.35 + rng() * 0.3);
+  return ring;
+}
+
+// ── Doomed moon + tidal ring (adapted from cities.obj) ───
+function buildDoomedMoon(rng, planetNode, planetRadius) {
+  const dmR      = planetRadius * (0.12 + rng() * 0.10);
+  const dmOrbitR = planetRadius * (1.5 + rng() * 0.8);
+  const dmSpeed  = 0.08 + rng() * 0.10;
+  const dmTilt   = (rng() - 0.5) * 0.5;
+  const dmAngle  = rng() * Math.PI * 2;
+  const dmType   = rng() < 0.3 ? 'black' : 'rock';
+  const dmHue    = rng() * 0.08;
+  const dmColor  = dmType === 'black'
+    ? new THREE.Color(0.08, 0.08, 0.10)
+    : new THREE.Color().setHSL(dmHue, 0.35, 0.38);
+  const { map: dm_map, normalMap: dm_nm } = _makeRockyTex(dmHue, rng()*99999, dmType);
+  const dmMesh = new THREE.Mesh(
+    new THREE.SphereGeometry(dmR, 12, 12),
+    new THREE.MeshPhongMaterial({ color: dmColor, map: dm_map, normalMap: dm_nm, shininess: 5 }),
+  );
+  planetNode.add(dmMesh);
+
+  const tNorm   = Math.sqrt(1 + dmTilt * dmTilt);
+  const RING_N  = 3000;
+  const ringPos = new Float32Array(RING_N * 3);
+  const ringCol = new Float32Array(RING_N * 3);
+  const ringData = [];
+  for (let i = 0; i < RING_N; i++) {
+      // stagger initial phases around full orbit so there's no startup clump
+    const bA = rng() * Math.PI * 2;
+    ringData.push({
+      birthX: Math.cos(bA) * dmOrbitR,
+      birthY: Math.sin(bA) * dmOrbitR * dmTilt,
+      birthZ: Math.sin(bA) * dmOrbitR,
+      targetPa: rng() * Math.PI * 2,
+      targetPr: dmOrbitR * (0.55 + rng() * 0.9),
+      phase: rng(),                              // pre-scattered along trail
+      phaseSpeed: 0.0008 + rng() * 0.0012,
+      drift: (0.0001 + rng() * 0.0003) * (rng() < 0.5 ? 1 : -1),
+      waitTime: 0,
+    });
+    ringCol[i*3] = dmColor.r; ringCol[i*3+1] = dmColor.g; ringCol[i*3+2] = dmColor.b;
+  }
+
+  const ringGeo = new THREE.BufferGeometry();
+  ringGeo.setAttribute('position', new THREE.BufferAttribute(ringPos, 3));
+  ringGeo.setAttribute('color',    new THREE.BufferAttribute(ringCol, 3));
+  const ringPoints = new THREE.Points(ringGeo, new THREE.PointsMaterial({
+    size: 1.4, vertexColors: true, transparent: true, opacity: 0.65, depthWrite: false,
+  }));
+  ringPoints.frustumCulled = false;
+  planetNode.add(ringPoints);
+
+  return { mesh: dmMesh, ringPoints, ringGeo, ringData, RING_N,
+           orbitR: dmOrbitR, speed: dmSpeed, tilt: dmTilt, tNorm, angle: dmAngle };
+}
+
+function tickDoomedMoon(dm, dt) {
+  dm.angle += dm.speed * dt;
+  const moonRelX = Math.cos(dm.angle) * dm.orbitR;
+  const moonRelY = Math.sin(dm.angle) * dm.orbitR * dm.tilt;
+  const moonRelZ = Math.sin(dm.angle) * dm.orbitR;
+  dm.mesh.position.set(moonRelX, moonRelY, moonRelZ);
+
+  const rpos = dm.ringGeo.attributes.position.array;
+  for (let i = 0; i < dm.RING_N; i++) {
+    const d = dm.ringData[i];
+    if (d.phase >= 1) {
+      d.waitTime -= dt;
+      if (d.waitTime <= 0) {
+        // Respawn from current moon position
+        d.birthX = moonRelX; d.birthY = moonRelY; d.birthZ = moonRelZ;
+        d.targetPa = Math.random() * Math.PI * 2;
+        d.phase = 0; d.waitTime = 0;
+      }
+      d.targetPa += d.drift * dt;
+    } else {
+      d.phase = Math.min(1, d.phase + d.phaseSpeed * dt);
+    }
+    const t = d.phase * d.phase * (3 - 2 * d.phase); // smoothstep
+    const tx = Math.cos(d.targetPa) * d.targetPr;
+    const ty = Math.sin(d.targetPa) * d.targetPr * dm.tilt / dm.tNorm;
+    const tz = Math.sin(d.targetPa) * d.targetPr / dm.tNorm;
+    rpos[i*3]   = d.birthX + (tx - d.birthX) * t;
+    rpos[i*3+1] = d.birthY + (ty - d.birthY) * t;
+    rpos[i*3+2] = d.birthZ + (tz - d.birthZ) * t;
+  }
+  dm.ringGeo.attributes.position.needsUpdate = true;
+}
+
+// ── Asteroid Belt ─────────────────────────────────────────
+function buildAsteroidBelt(innerR, outerR) {
+  const count = 5000;
+  const pos = new Float32Array(count * 3);
+  const col = new Float32Array(count * 3);
+  const thickness = (outerR - innerR) * 0.12;
+  for (let i = 0; i < count; i++) {
+    const angle = Math.random() * Math.PI * 2;
+    const r = innerR + Math.random() * (outerR - innerR);
+    pos[i*3]   = Math.cos(angle) * r;
+    pos[i*3+1] = (Math.random() - 0.5) * thickness;
+    pos[i*3+2] = Math.sin(angle) * r;
+    const grey = 0.45 + Math.random() * 0.45;
+    col[i*3] = grey * 0.88; col[i*3+1] = grey * 0.84; col[i*3+2] = grey * 0.78;
+  }
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  geo.setAttribute('color',    new THREE.BufferAttribute(col, 3));
+  return new THREE.Points(geo, new THREE.PointsMaterial({ size: 1.0, vertexColors: true }));
+}
+
+// ── Solar Corona ──────────────────────────────────────────
+function buildCorona(starRadius) {
+  const count = 1800;
+  const pos = new Float32Array(count * 3);
+  const col = new Float32Array(count * 3);
+  const vel = new Float32Array(count * 3);
+  for (let i = 0; i < count; i++) {
+    resetCoronaParticle(i, pos, vel, col, starRadius);
+    const frac = Math.random() * 3; // stagger initial distances so corona doesn't pulse on spawn
+    pos[i*3]   *= (1 + frac * 0.5);
+    pos[i*3+1] *= (1 + frac * 0.5);
+    pos[i*3+2] *= (1 + frac * 0.5);
+  }
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  geo.setAttribute('color',    new THREE.BufferAttribute(col, 3));
+  const pts = new THREE.Points(geo, new THREE.PointsMaterial({
+    size: 1.4, vertexColors: true,
+    transparent: true, opacity: 0.75,
+    blending: THREE.AdditiveBlending, depthWrite: false,
+  }));
+  pts.userData = { vel, starRadius };
+  return pts;
+}
+
+function resetCoronaParticle(i, pos, vel, col, sr) {
+  const theta = Math.random() * Math.PI * 2;
+  const phi   = Math.acos(2 * Math.random() - 1);
+  const r     = sr * (1 + Math.random() * 0.35);
+  const nx = Math.sin(phi) * Math.cos(theta);
+  const ny = Math.sin(phi) * Math.sin(theta);
+  const nz = Math.cos(phi);
+  pos[i*3] = nx*r; pos[i*3+1] = ny*r; pos[i*3+2] = nz*r;
+  const speed = 0.25 + Math.random() * 0.55;
+  vel[i*3] = nx*speed; vel[i*3+1] = ny*speed; vel[i*3+2] = nz*speed;
+  const t = Math.random();
+  col[i*3] = 1; col[i*3+1] = 0.45 + t * 0.5; col[i*3+2] = t * 0.15;
+}
+
+function updateCorona(pts, dt) {
+  const pa  = pts.geometry.attributes.position.array;
+  const { vel, starRadius } = pts.userData;
+  const col = pts.geometry.attributes.color.array;
+  const limit = starRadius * 3.8;
+  for (let i = 0; i < pa.length / 3; i++) {
+    pa[i*3]   += vel[i*3]   * dt * 22;
+    pa[i*3+1] += vel[i*3+1] * dt * 22;
+    pa[i*3+2] += vel[i*3+2] * dt * 22;
+    const r2 = pa[i*3]*pa[i*3] + pa[i*3+1]*pa[i*3+1] + pa[i*3+2]*pa[i*3+2];
+    if (r2 > limit * limit) resetCoronaParticle(i, pa, vel, col, starRadius);
+  }
+  pts.geometry.attributes.position.needsUpdate = true;
+}
+
+// ── System State ──────────────────────────────────────────
+let systemGroup = null;
+let planets = [];
+let coronaPts = null;
+const raycaster  = new THREE.Raycaster();
+const _mouse     = new THREE.Vector2();
+const _progDir   = new THREE.Vector3();
+const _yAxis     = new THREE.Vector3(0, 1, 0);
+let   _mdownX    = 0, _mdownY = 0;
+let   _activePlanet  = null;
+let   _previewGroup  = null;
+let   _osculatingGroup = null;
+let   _oscUpdateCounter = 0;
+let   _transferArc    = null;   // Hohmann arc line in system space
+let   _transferMarker = null;   // arrival-point marker
+let   _transferState  = null;   // { from, to, a, φ_req } for live updates
+let   _flightStates   = [];     // active interplanetary transit animations
+let asteroidGroup = new THREE.Group();
+let showOrbits   = true;
+let lockedPlanet = null;
+let homePlanet   = null;
+const scheduledMissions = [];
+let _missionId = 0;
+let lockedOffset = new THREE.Vector3();   // camera position relative to locked planet
+let showAsteroid = false;
+let paused       = false;
+let simSpeed     = 1;
+const SIM_SPEEDS = [0.1, 0.25, 0.5, 1, 2, 5, 10, 50, 100];
+let simSpeedIdx  = 3;   // index into SIM_SPEEDS, starts at 1×
+let showCorona   = true;
+let ambientLight = null;
+
+const PLANET_NAMES = [
+  'Aethon','Bruhn','Caldris','Daxus','Eryndel',
+  'Faevorn','Golath','Hydria','Istar','Joval',
+];
+
+// ── Single planet pipeline ────────────────────────────────
+function spawnPlanet(typeDef, rng, orbitR, name, zoneT = 0.5) {
+  const radius      = rr(rng, typeDef.radiusRange[0], typeDef.radiusRange[1]);
+  const inclination = (rng() - 0.5) * 0.38;
+  const startAngle  = rng() * Math.PI * 2;
+  const selfSpin    = (rng() - 0.45) * 0.25;
+  const speed       = (0.06 / Math.sqrt(orbitR / 50)) * (0.7 + rng() * 0.6);
+
+  const { map, normalMap, emissiveMap, color } = typeDef.makeTex(rng);
+  const matProps = { color, shininess: typeDef.shininess };
+  if (map)       matProps.map       = map;
+  if (normalMap) matProps.normalMap = normalMap;
+  if (emissiveMap && typeDef.emissive) {
+    matProps.emissiveMap       = emissiveMap;
+    matProps.emissive          = typeDef.emissive.color;
+    matProps.emissiveIntensity = typeDef.emissive.intensity;
+  }
+
+  // scene graph: tiltGroup → planetNode → mesh + extras
+  const tiltGroup = new THREE.Group();
+  tiltGroup.rotation.x = inclination;
+  systemGroup.add(tiltGroup);
+
+  const planetNode = new THREE.Group();
+  tiltGroup.add(planetNode);
+
+  const mesh = new THREE.Mesh(new THREE.SphereGeometry(radius, 36, 36), new THREE.MeshPhongMaterial(matProps));
+  planetNode.add(mesh);
+
+  if (typeDef.atmColor) {
+    planetNode.add(new THREE.Mesh(
+      new THREE.SphereGeometry(radius * 1.07, 24, 24),
+      new THREE.MeshBasicMaterial({
+        color: typeDef.atmColor, transparent: true, opacity: 0.1,
+        blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.BackSide,
+      }),
+    ));
+  }
+
+  // rings — simple mesh or doomed-moon tidal stream
+  let doomedMoon = null;
+  if (rng() < (typeDef.ringChance ?? 0.15) * zoneT) {
+    if (typeDef.doomedMoonChance && rng() < typeDef.doomedMoonChance) {
+      doomedMoon = buildDoomedMoon(rng, planetNode, radius);
+    } else {
+      planetNode.add(buildPlanetRings(rng, radius));
+    }
+  }
+
+  const moons = [];
+  const moonCount = rng() < (typeDef.moonChance ?? 0.35)
+    ? ri(rng, 1, typeDef.moonCountRange?.[1] ?? 2) : 0;
+  for (let m = 0; m < moonCount; m++) {
+    const mr         = 0.35 + rng() * 0.7;
+    const moonOrbitR = radius * (1.9 + rng() * 1.8);
+    const moonSpeed  = 0.15 + rng() * 0.25;
+    const moonAngle  = rng() * Math.PI * 2;
+    const mType      = rng() < 0.3 ? 'black' : 'rock';
+    const mHue       = rng() * 0.08;
+    const { map: mm, normalMap: mn } = _makeRockyTex(mHue, rng()*99999, mType);
+    const moonNode   = new THREE.Group();
+    planetNode.add(moonNode);
+    moonNode.add(new THREE.Mesh(
+      new THREE.SphereGeometry(mr, 14, 14),
+      new THREE.MeshPhongMaterial({
+        color: mType === 'black' ? new THREE.Color(0.08,0.08,0.10) : new THREE.Color().setHSL(mHue,0.35,0.38),
+        map: mm, normalMap: mn, shininess: mType === 'black' ? 4 : 5,
+      }),
+    ));
+    moons.push({ node: moonNode, orbitR: moonOrbitR, speed: moonSpeed, angle: moonAngle });
+  }
+
+  const orbitRing = buildOrbitRing(orbitR);
+  orbitRing.rotation.x = inclination;
+  orbitRing.visible = showOrbits;
+  systemGroup.add(orbitRing);
+
+  const rocket = null;
+
+  return { mesh, planetNode, tiltGroup, orbitR, speed, angle: startAngle, selfSpin,
+           moons, doomedMoon, orbitRing, rocket, name,
+           type: typeDef.id, label: typeDef.label, dotColor: typeDef.dotColor, radius,
+           soiRadius: radius * 6,
+           GM: radius * radius * radius * 0.5,
+           sidebarEntry: null };
+}
+
+// ── Rocket factory (used for home planet) ─────────────────
+function spawnRocket(planet) {
+  if (planet.rocket) return planet.rocket;
+  const { planetNode, radius } = planet;
+  const rA   = radius * (3.5 + Math.random() * 2.5);
+  const rE   = Math.min(0.1 + Math.random() * 0.3, 1 - (radius * 1.15) / rA);
+  const rInc = (Math.random() - 0.5) * Math.PI * 0.4;
+  const rArg = Math.random() * Math.PI * 2;
+  const rSpd = 0.25 + Math.random() * 0.4;
+  const rB   = rA * Math.sqrt(1 - rE * rE);
+  const rFrame = new THREE.Group();
+  rFrame.rotation.order = 'YXZ';
+  rFrame.rotation.y = rArg;
+  rFrame.rotation.x = rInc;
+  planetNode.add(rFrame);
+  const rMesh = buildRocketMesh(radius * 0.8);
+  rFrame.add(rMesh);
+  const rRing = buildEllipticalOrbitRing(rA, rE);
+  rRing.visible = showOrbits;
+  rFrame.add(rRing);
+  const rGM   = rSpd * rSpd * rA * rA * rA;
+  const vCirc = Math.sqrt(rGM / rA);
+  planet.rocket = {
+    frame: rFrame, mesh: rMesh, orbitRing: rRing,
+    a: rA, b: rB, e: rE, c: rA * rE,
+    inclination: rInc, argPeri: rArg, speed: rSpd,
+    angle: Math.random() * Math.PI * 2,
+    planetRadius: radius,
+    GM: rGM,
+    deltav: vCirc * (3.0 + Math.random() * 3.0),
+    usedDV: 0,
+    worldPos: new THREE.Vector3(),
+    nearBody: null, nearDist: Infinity, osculatingElements: null,
+  };
+  if (planet.sidebarEntry && !planet.sidebarEntry.querySelector('.rocket-tag')) {
+    const tag = document.createElement('span');
+    tag.className = 'rocket-tag'; tag.textContent = 'SAT';
+    planet.sidebarEntry.appendChild(tag);
+  }
+  return planet.rocket;
+}
+
+// ── Generate System ───────────────────────────────────────
+function generateSystem(seed, planetCount) {
+  if (systemGroup) {
+    scene.remove(systemGroup);
+    systemGroup.traverse(o => {
+      if (o.geometry) o.geometry.dispose();
+      if (o.material) (Array.isArray(o.material) ? o.material : [o.material]).forEach(m => m.dispose());
+    });
+  }
+  if (ambientLight) scene.remove(ambientLight);
+  planets = [];
+  homePlanet = null;
+  scheduledMissions.length = 0;
+  _flightStates = [];
+
+  const rng = makeRng(seed);
+  systemGroup = new THREE.Group();
+  scene.add(systemGroup);
+
+  const starRadius = 10 + rng() * 14;
+  const { texture: starTex, type: st } = makeStarTexture(rng);
+
+  const starMesh = new THREE.Mesh(
+    new THREE.SphereGeometry(starRadius, 40, 40),
+    new THREE.MeshBasicMaterial({ map: starTex }),
+  );
+  systemGroup.add(starMesh);
+
+  // Outer glow sphere
+  const glowMat = new THREE.MeshBasicMaterial({
+    color: new THREE.Color(st.outer),
+    transparent: true, opacity: 0.22,
+    blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.BackSide,
+  });
+  systemGroup.add(new THREE.Mesh(new THREE.SphereGeometry(starRadius * 4.0, 32, 32), glowMat));
+
+  const starLight = new THREE.PointLight(new THREE.Color(st.light), 2.5, 0, 0); // decay=0 → no falloff, distant planets stay lit
+  systemGroup.add(starLight);
+
+  ambientLight = new THREE.AmbientLight(0x334466, 1.2);
+  scene.add(ambientLight);
+
+  // Corona
+  coronaPts = buildCorona(starRadius);
+  coronaPts.visible = showCorona;
+  systemGroup.add(coronaPts);
+
+  const entryList = document.getElementById('planet-entries');
+  entryList.innerHTML = '';
+
+  lockedPlanet = null;
+  clearPreview();
+  clearOsculating();
+  clearTransfer();
+  _activePlanet = null;
+  document.getElementById('orbit-panel').style.display = 'none';
+
+  const starEntry = document.createElement('div');
+  starEntry.className = 'planet-entry';
+  starEntry.innerHTML = `<div class="planet-dot" style="background:#ffcc44;box-shadow:0 0 5px #ffcc44;"></div>
+    <span class="pname">Star <span class="ptype">(${st.name})</span></span>`;
+  starEntry.addEventListener('click', () => {
+    document.querySelectorAll('.planet-entry.locked').forEach(e => e.classList.remove('locked'));
+    lockedPlanet = null;
+    controls.target.set(0, 0, 0);
+  });
+  entryList.appendChild(starEntry);
+
+  let orbitR = starRadius * (2.6 + rng() * 1.2);
+
+  for (let i = 0; i < planetCount; i++) {
+    const gap = orbitR * (0.28 + rng() * 0.38);
+    orbitR += gap + starRadius * (0.9 + rng() * 0.5);
+
+    const zoneT   = i / Math.max(1, planetCount - 1);
+    const typeDef = samplePlanetType(rng, zoneT);
+    const planet  = spawnPlanet(typeDef, rng, orbitR, PLANET_NAMES[i % PLANET_NAMES.length], zoneT);
+    planets.push(planet);
+
+    const entry = document.createElement('div');
+    entry.className = 'planet-entry';
+    entry.innerHTML = `<div class="planet-dot" style="background:${planet.dotColor};"></div>
+      <span class="pname">${planet.name} <span class="ptype">(${planet.label})</span></span>
+      ${planet.rocket ? '<span class="rocket-tag">SAT</span>' : ''}`;
+    entry.addEventListener('click', () => {
+      if (lockedPlanet === planet) {
+        lockedPlanet = null;
+        entry.classList.remove('locked');
+      } else {
+        document.querySelectorAll('.planet-entry.locked').forEach(e => e.classList.remove('locked'));
+        lockedPlanet = planet;
+        entry.classList.add('locked');
+        const pos = new THREE.Vector3();
+        planet.mesh.getWorldPosition(pos);
+        controls.target.copy(pos);
+        camera.position.copy(pos).addScaledVector(new THREE.Vector3(1, 0.6, 1).normalize(), planet.radius * 8);
+      }
+    });
+    planet.sidebarEntry = entry;
+    entryList.appendChild(entry);
+  }
+
+  // Pick home planet: prefer habitable types in inner 60%, fall back to 2nd planet
+  const innerCut = Math.ceil(planets.length * 0.6);
+  homePlanet = planets.slice(0, innerCut).find(p => p.type === 'water' || p.type === 'ocean' || p.type === 'rock')
+            ?? planets[Math.min(1, planets.length - 1)];
+  const homeTag = document.createElement('span');
+  homeTag.className = 'home-tag';
+  homeTag.textContent = 'HOME';
+  homeTag.title = 'Home planet — click to open rocket panel';
+  homeTag.addEventListener('click', e => {
+    e.stopPropagation();
+    openOrbitPanel(homePlanet);
+  });
+  homePlanet.sidebarEntry.appendChild(homeTag);
+
+  asteroidGroup.clear();
+  if (planets.length >= 3) {
+    const beltIdx = Math.floor(planets.length * 0.45);
+    const innerR = planets[beltIdx - 1]?.orbitR * 1.12 ?? 80;
+    const outerR = planets[beltIdx]?.orbitR * 0.92 ?? 120;
+    if (outerR > innerR + 5) asteroidGroup.add(buildAsteroidBelt(innerR, outerR));
+  }
+  if (showAsteroid) systemGroup.add(asteroidGroup);
+
+  const lastR = planets.at(-1)?.orbitR ?? 200;
+  camera.position.set(0, lastR * 0.45, lastR * 1.1);
+  controls.target.set(0, 0, 0);
+}
+
+// ── Static scene objects ──────────────────────────────────
+scene.add(buildStarfield());
+
+// ── First system ──────────────────────────────────────────
+generateSystem(42, 6);
+
+// ── Animation Loop ────────────────────────────────────────
+renderer.setAnimationLoop(() => {
+  const dt = clock.getDelta() * (paused ? 0 : simSpeed);
+
+  for (const p of planets) {
+    p.angle += p.speed * dt;
+    p.planetNode.position.set(
+      Math.cos(p.angle) * p.orbitR,
+      0,
+      Math.sin(p.angle) * p.orbitR,
+    );
+    p.mesh.rotation.y += p.selfSpin * dt;
+
+    for (const moon of p.moons) {
+      moon.angle += moon.speed * dt;
+      moon.node.position.set(
+        Math.cos(moon.angle) * moon.orbitR,
+        0,
+        Math.sin(moon.angle) * moon.orbitR,
+      );
+    }
+
+    if (p.doomedMoon) tickDoomedMoon(p.doomedMoon, dt);
+
+    if (p.rocket) {
+      const r = p.rocket;
+      r.angle += r.speed * dt;
+      r.mesh.position.set(r.a * Math.cos(r.angle) - r.c, 0, r.b * Math.sin(r.angle));
+      const vx = -r.a * Math.sin(r.angle), vz = r.b * Math.cos(r.angle);
+      const vl = Math.sqrt(vx * vx + vz * vz);
+      if (vl > 0) {
+        _progDir.set(vx / vl, 0, vz / vl);
+        r.mesh.quaternion.setFromUnitVectors(_yAxis, _progDir);
+      }
+      r.mesh.getWorldPosition(r.worldPos);
+    }
+  }
+
+  // Keep osculating ring anchored to nearBody as it moves
+  if (_osculatingGroup && _activePlanet?.rocket?.nearBody) {
+    _activePlanet.rocket.nearBody.mesh.getWorldPosition(_osculatingGroup.position);
+  }
+
+  // Refresh SOI detection + osculating ring every 6 frames when panel is open
+  _oscUpdateCounter++;
+  if (_activePlanet?.rocket && _oscUpdateCounter % 6 === 0) {
+    refreshOsculatingRing(_activePlanet.rocket, _activePlanet);
+  }
+
+  // Live-update transfer arc (follows departure planet) and alignment countdown
+  if (_transferState && !_flightStates.length) {
+    updateTransferArc();
+    if (_oscUpdateCounter % 15 === 0) updateTransferAlignment();
+  }
+
+  for (const f of [..._flightStates]) tickFlight(f, dt);
+  if (_oscUpdateCounter % 30 === 0 && scheduledMissions.length) {
+    checkScheduledMissions();
+    if (_activePlanet === homePlanet) updateMissionListUI();
+  }
+
+  if (coronaPts && showCorona) updateCorona(coronaPts, dt);
+
+  if (lockedPlanet) {
+    const wp = new THREE.Vector3();
+    lockedPlanet.mesh.getWorldPosition(wp);
+      // recompute offset each frame so the user can still orbit while locked
+    lockedOffset.subVectors(camera.position, controls.target);
+    controls.target.copy(wp);
+    camera.position.addVectors(wp, lockedOffset);
+  }
+
+  controls.update();
+  renderer.render(scene, camera);
+});
+
+// ── UI ────────────────────────────────────────────────────
+document.getElementById('planet-count').addEventListener('input', e => {
+  document.getElementById('planet-count-val').textContent = e.target.value;
+});
+
+document.getElementById('btn-generate').addEventListener('click', () => {
+  generateSystem(
+    parseInt(document.getElementById('seed-input').value) || 0,
+    parseInt(document.getElementById('planet-count').value),
+  );
+});
+
+document.getElementById('btn-random').addEventListener('click', () => {
+  const seed = Math.floor(Math.random() * 999999);
+  document.getElementById('seed-input').value = seed;
+  generateSystem(seed, parseInt(document.getElementById('planet-count').value));
+});
+
+document.getElementById('btn-orbits').addEventListener('click', function () {
+  showOrbits = !showOrbits;
+  this.textContent = `Orbits: ${showOrbits ? 'ON' : 'OFF'}`;
+  this.classList.toggle('active', showOrbits);
+  for (const p of planets) {
+    p.orbitRing.visible = showOrbits;
+    if (p.rocket) p.rocket.orbitRing.visible = showOrbits;
+  }
+});
+
+document.getElementById('btn-asteroid').addEventListener('click', function () {
+  showAsteroid = !showAsteroid;
+  this.textContent = showAsteroid ? 'Asteroids: ON' : 'Asteroid Belt';
+  this.classList.toggle('active', showAsteroid);
+  if (showAsteroid) systemGroup.add(asteroidGroup);
+  else systemGroup.remove(asteroidGroup);
+});
+
+document.getElementById('btn-corona').addEventListener('click', function () {
+  showCorona = !showCorona;
+  this.textContent = `Corona: ${showCorona ? 'ON' : 'OFF'}`;
+  this.classList.toggle('active', showCorona);
+  if (coronaPts) coronaPts.visible = showCorona;
+});
+
+function updateSpeedUI() {
+  document.getElementById('sim-speed-label').textContent = SIM_SPEEDS[simSpeedIdx] + '×';
+  document.getElementById('btn-slower').disabled = simSpeedIdx === 0;
+  document.getElementById('btn-faster').disabled = simSpeedIdx === SIM_SPEEDS.length - 1;
+  document.getElementById('btn-pause').textContent = paused ? '▶' : '⏸';
+  document.getElementById('btn-pause').classList.toggle('active', paused);
+}
+
+document.getElementById('btn-slower').addEventListener('click', () => {
+  if (simSpeedIdx > 0) { simSpeedIdx--; simSpeed = SIM_SPEEDS[simSpeedIdx]; updateSpeedUI(); }
+});
+document.getElementById('btn-faster').addEventListener('click', () => {
+  if (simSpeedIdx < SIM_SPEEDS.length - 1) { simSpeedIdx++; simSpeed = SIM_SPEEDS[simSpeedIdx]; updateSpeedUI(); }
+});
+document.getElementById('btn-pause').addEventListener('click', () => {
+  paused = !paused;
+  updateSpeedUI();
+});
+
+// ── Proposed-orbit preview (red line) ────────────────────
+function clearPreview() {
+  if (!_previewGroup) return;
+  if (_previewGroup.parent) _previewGroup.parent.remove(_previewGroup);
+  _previewGroup.children.forEach(c => {
+    if (c.geometry) c.geometry.dispose();
+    if (c.material) c.material.dispose();
+  });
+  _previewGroup = null;
+}
+
+function clearOsculating() {
+  if (!_osculatingGroup) return;
+  if (_osculatingGroup.parent) _osculatingGroup.parent.remove(_osculatingGroup);
+  _osculatingGroup.traverse(o => {
+    if (o.geometry) o.geometry.dispose();
+    if (o.material) o.material.dispose();
+  });
+  _osculatingGroup = null;
+}
+
+function clearTransfer() {
+  if (_transferArc)   { if (_transferArc.parent)    _transferArc.parent.remove(_transferArc);       _transferArc.geometry.dispose();    _transferArc.material.dispose();    _transferArc    = null; }
+  if (_transferMarker){ if (_transferMarker.parent)  _transferMarker.parent.remove(_transferMarker); _transferMarker.geometry.dispose(); _transferMarker.material.dispose(); _transferMarker = null; }
+  // Only abort manual flights (mission flights continue independently)
+  for (let i = _flightStates.length - 1; i >= 0; i--) {
+    const f = _flightStates[i];
+    if (!f.mission) {
+      if (f.flightMesh?.parent) f.flightMesh.parent.remove(f.flightMesh);
+      if (f.rocket) f.rocket.frame.visible = true;
+      _flightStates.splice(i, 1);
+    }
+  }
+  _transferState = null;
+  document.getElementById('op-transfer-info').style.display = 'none';
+  document.getElementById('op-transfer-target').value = '';
+}
+
+function drawTransfer(from, to) {
+  clearTransfer();
+
+  const r1 = from.orbitR, r2 = to.orbitR;
+  // Star GM from departure planet's circular orbit: v = ω·r → GM = ω²·r³
+  const GM  = from.speed * from.speed * r1 * r1 * r1;
+  const a   = (r1 + r2) / 2;
+
+  // Pre-allocated arc geometry — updated live each frame as departure planet moves
+  const arcPos = new Float32Array(81 * 3);
+  const arcGeo = new THREE.BufferGeometry();
+  arcGeo.setAttribute('position', new THREE.BufferAttribute(arcPos, 3));
+  _transferArc = new THREE.Line(arcGeo,
+    new THREE.LineBasicMaterial({ color: 0x44ddff, transparent: true, opacity: 0.85 }));
+  systemGroup.add(_transferArc);
+
+  _transferMarker = new THREE.Mesh(
+    new THREE.SphereGeometry(Math.max(2, to.radius * 0.4), 8, 8),
+    new THREE.MeshBasicMaterial({ color: 0x44ddff, transparent: true, opacity: 0.75 }),
+  );
+  systemGroup.add(_transferMarker);
+
+  // Δv (heliocentric vis-viva, static — depends only on orbit radii)
+  const v1  = Math.sqrt(GM / r1), vt1 = Math.sqrt(GM * 2*r2 / (r1*(r1+r2)));
+  const v2  = Math.sqrt(GM / r2), vt2 = Math.sqrt(GM * 2*r1 / (r2*(r1+r2)));
+  const dv1 = Math.abs(vt1 - v1), dv2 = Math.abs(vt2 - v2);
+
+  // Transfer time T = π√(a³/GM), required phase angle for target at arrival
+  const xferTime = Math.PI * Math.sqrt(a * a * a / GM);
+  // Target must be (π − ω₂·T) ahead of departure so it arrives at the rendezvous point
+  const φ_req = ((Math.PI - to.speed * xferTime) % (2*Math.PI) + 2*Math.PI) % (2*Math.PI);
+
+  const mins = Math.floor(xferTime / 60), secs = Math.round(xferTime % 60);
+  document.getElementById('op-xfer-time').textContent    = mins > 0 ? `${mins}m ${secs}s` : `${secs}s`;
+  document.getElementById('op-xfer-dv1').textContent     = dv1.toFixed(3) + ' Δv';
+  document.getElementById('op-xfer-dv2').textContent     = dv2.toFixed(3) + ' Δv';
+  document.getElementById('op-xfer-dvtotal').textContent = (dv1+dv2).toFixed(3) + ' Δv';
+  document.getElementById('op-xfer-dvtotal').style.color = '#4af';
+  document.getElementById('op-transfer-info').style.display = '';
+
+  _transferState = { from, to, a, GM, φ_req };
+  updateTransferArc();
+  updateTransferAlignment();
+}
+
+// Rebuild the arc from the departure planet's current position — called each frame
+function updateTransferArc() {
+  if (!_transferState) return;
+  const { from, to, a } = _transferState;
+  const r1 = from.orbitR, r2 = to.orbitR;
+  const c  = Math.abs(r2 - r1) / 2;
+  const b  = Math.sqrt(r1 * r2);
+  const outbound = r1 < r2;
+  const θ  = outbound ? from.angle : from.angle + Math.PI;
+  const pos = _transferArc.geometry.attributes.position.array;
+
+  for (let i = 0; i <= 80; i++) {
+    const t  = outbound ? (i/80)*Math.PI : Math.PI + (i/80)*Math.PI;
+    const lx = a * Math.cos(t) - c;
+    const ly = b * Math.sin(t);
+    pos[i*3]   = lx * Math.cos(θ) - ly * Math.sin(θ);
+    pos[i*3+1] = 0;
+    pos[i*3+2] = lx * Math.sin(θ) + ly * Math.cos(θ);
+  }
+  _transferArc.geometry.attributes.position.needsUpdate = true;
+  _transferArc.geometry.computeBoundingSphere();
+
+  // Move arrival marker to arc endpoint
+  const n = 80 * 3;
+  _transferMarker.position.set(pos[n], 0, pos[n+2]);
+}
+
+// Recompute current vs required phase angle and time to next window
+function updateTransferAlignment() {
+  if (!_transferState) return;
+  const { from, to, φ_req } = _transferState;
+
+  const φ_cur = ((to.angle - from.angle) % (2*Math.PI) + 2*Math.PI) % (2*Math.PI);
+
+  // Angular rate at which the phase angle changes (ω_target − ω_departure)
+  const rate   = to.speed - from.speed;
+  // Signed error: how far we need the phase to shift
+  let waitTime = 0;
+  if (Math.abs(rate) > 1e-9) {
+    waitTime = (φ_req - φ_cur) / rate;
+    if (waitTime < 0) waitTime += 2 * Math.PI / Math.abs(rate);
+  }
+
+  // Phase error magnitude (0° = perfectly aligned)
+  const errDeg = Math.abs(((φ_req - φ_cur + Math.PI) % (2*Math.PI)) - Math.PI) * 180/Math.PI;
+  const aligned = errDeg < 4;
+
+  document.getElementById('op-xfer-phase').textContent =
+    `${(φ_cur*180/Math.PI).toFixed(0)}° → ${(φ_req*180/Math.PI).toFixed(0)}°`;
+  document.getElementById('op-xfer-phase').style.color = aligned ? '#4f8' : '#778';
+
+  _transferState.waitTime = aligned ? 0 : waitTime;
+
+  const skipBtn = document.getElementById('op-xfer-skip');
+  const execBtn = document.getElementById('op-xfer-execute');
+  if (aligned) {
+    document.getElementById('op-xfer-window').textContent = 'OPEN';
+    document.getElementById('op-xfer-window').style.color = '#4f8';
+    skipBtn.disabled = true;
+    skipBtn.style.opacity = '0.35';
+    execBtn.disabled = false;
+    execBtn.style.opacity = '1';
+  } else {
+    const wm = Math.floor(waitTime/60), ws = Math.round(waitTime%60);
+    document.getElementById('op-xfer-window').textContent = wm > 0 ? `~${wm}m ${ws}s` : `~${ws}s`;
+    document.getElementById('op-xfer-window').style.color = '#aac';
+    skipBtn.disabled = false;
+    skipBtn.style.opacity = '1';
+    execBtn.disabled = true;
+    execBtn.style.opacity = '0.35';
+  }
+}
+
+function skipToWindow() {
+  if (!_transferState || !_transferState.waitTime) return;
+  const dt = _transferState.waitTime;
+  for (const p of planets) {
+    p.angle += dt * p.speed;
+    p.planetNode.position.set(Math.cos(p.angle) * p.orbitR, 0, Math.sin(p.angle) * p.orbitR);
+    for (const moon of p.moons) {
+      moon.angle += dt * moon.speed;
+      moon.node.position.set(Math.cos(moon.angle) * moon.orbitR, 0, Math.sin(moon.angle) * moon.orbitR);
+    }
+    if (p.doomedMoon) p.doomedMoon.angle += dt * p.doomedMoon.speed;
+    if (p.rocket)     p.rocket.angle     += dt * p.rocket.speed;
+  }
+  updateTransferArc();
+  updateTransferAlignment();
+}
+
+// ── Shared transfer-window math ───────────────────────────
+function computeTransferWindow(from, to) {
+  const r1 = from.orbitR, r2 = to.orbitR;
+  const GM  = from.speed * from.speed * r1 * r1 * r1;
+  const a   = (r1 + r2) / 2;
+  const xferTime = Math.PI * Math.sqrt(a * a * a / GM);
+  const φ_req = ((Math.PI - to.speed * xferTime) % (2*Math.PI) + 2*Math.PI) % (2*Math.PI);
+  const φ_cur = ((to.angle - from.angle) % (2*Math.PI) + 2*Math.PI) % (2*Math.PI);
+  const errDeg = Math.abs(((φ_req - φ_cur + Math.PI) % (2*Math.PI)) - Math.PI) * 180/Math.PI;
+  const rate = to.speed - from.speed;
+  let waitTime = 0;
+  if (Math.abs(rate) > 1e-9) {
+    waitTime = (φ_req - φ_cur) / rate;
+    if (waitTime < 0) waitTime += 2 * Math.PI / Math.abs(rate);
+  }
+  return { aligned: errDeg < 4, waitTime, a, GM, xferTime };
+}
+
+// ── Mission scheduler ─────────────────────────────────────
+function scheduleMission(to, count) {
+  scheduledMissions.push({ id: ++_missionId, from: homePlanet, to, remaining: count, total: count, status: 'waiting' });
+  updateMissionListUI();
+}
+
+function cancelMission(id) {
+  const idx = scheduledMissions.findIndex(m => m.id === id);
+  if (idx >= 0) scheduledMissions.splice(idx, 1);
+  updateMissionListUI();
+}
+
+function updateMissionListUI() {
+  const el = document.getElementById('op-mission-list');
+  if (!el) return;
+  if (!scheduledMissions.length) { el.innerHTML = '<div style="color:#334;padding:2px 0">No missions queued.</div>'; return; }
+  el.innerHTML = scheduledMissions.map(m => {
+    const win = m.status === 'waiting' ? computeTransferWindow(m.from, m.to) : null;
+    const winStr = m.status === 'in-flight' ? '<span style="color:#4af">in transit</span>'
+      : win?.aligned ? '<span style="color:#4f8">OPEN</span>'
+      : (() => { const s = Math.round(win.waitTime); const mn = Math.floor(s/60); return `<span style="color:#556">~${mn>0?mn+'m ':''}${s%60}s</span>`; })();
+    return `<div style="display:flex;justify-content:space-between;align-items:center;padding:2px 0;border-bottom:1px solid #0d1020">
+      <span style="color:#889">→ ${m.to.name}</span>
+      <span style="color:#556">${m.total - m.remaining}/${m.total}</span>
+      ${winStr}
+      <span style="cursor:pointer;color:#446;padding:0 3px" data-cancel="${m.id}">×</span>
+    </div>`;
+  }).join('');
+}
+
+function launchScheduledRocket(mission, idx = 0) {
+  const { from, to } = mission;
+  const r = spawnRocket(from);
+  // Free the planet slot immediately so the next rocket can spawn
+  from.rocket = null;
+  if (from.sidebarEntry) { const t = from.sidebarEntry.querySelector('.rocket-tag'); if (t) t.remove(); }
+
+  const r1 = from.orbitR, r2 = to.orbitR;
+  const outbound = r1 < r2;
+  const { a, GM, xferTime } = computeTransferWindow(from, to);
+  const c_ = Math.abs(r2 - r1) / 2, b_ = Math.sqrt(r1 * r2);
+  const θ = outbound ? from.angle : from.angle + Math.PI;
+  const snapshotArc = new Float32Array(81 * 3);
+  for (let i = 0; i <= 80; i++) {
+    const t  = outbound ? (i/80)*Math.PI : Math.PI + (i/80)*Math.PI;
+    const lx = a * Math.cos(t) - c_, ly = b_ * Math.sin(t);
+    snapshotArc[i*3]   = lx * Math.cos(θ) - ly * Math.sin(θ);
+    snapshotArc[i*3+1] = 0;
+    snapshotArc[i*3+2] = lx * Math.sin(θ) + ly * Math.cos(θ);
+  }
+
+  const flightMesh = r.mesh.clone();
+  r.mesh.getWorldPosition(flightMesh.position);
+  systemGroup.add(flightMesh);
+  r.frame.visible = false;
+
+  _flightStates.push({
+    from, to, rocket: r, mission,
+    xferTime,
+    elapsed: idx * xferTime * 0.05,   // stagger: ~5% of transfer time between rockets
+    phase: 'flying',
+    flightMesh, snapshotArc,
+    captureElapsed: 0, captureDuration: 90,
+    capturePer: to.radius * (3 + idx * 0.4),   // spread arrival orbits
+    captureE0: 0.85,
+  });
+}
+
+function checkScheduledMissions() {
+  for (const m of scheduledMissions) {
+    if (m.status !== 'waiting' || m.remaining <= 0) continue;
+    if (computeTransferWindow(m.from, m.to).aligned) {
+      const count = m.remaining;
+      m.status = 'in-flight';
+      for (let i = 0; i < count; i++) launchScheduledRocket(m, i);
+      updateMissionListUI();
+      return;
+    }
+  }
+}
+
+function executeTransfer() {
+  if (!_transferState) return;
+  const { from, to, a, GM } = _transferState;
+  const r = from.rocket;
+  if (!r) return;
+
+  const xferTime = Math.PI * Math.sqrt(a * a * a / GM);
+
+  // Snapshot arc geometry at departure so the path stays fixed during flight
+  updateTransferArc();
+  const snapshotArc = new Float32Array(_transferArc.geometry.attributes.position.array);
+  _transferArc.visible = false;   // hide the live-rotating version during flight
+
+  // Clone rocket mesh for the in-flight visual; hide the original orbit frame
+  const flightMesh = r.mesh.clone();
+  r.mesh.getWorldPosition(flightMesh.position);
+  systemGroup.add(flightMesh);
+  r.frame.visible = false;
+
+  document.getElementById('op-xfer-skip').disabled    = true;
+  document.getElementById('op-xfer-skip').style.opacity    = '0.35';
+  document.getElementById('op-xfer-execute').disabled = true;
+  document.getElementById('op-xfer-execute').style.opacity = '0.35';
+
+  _flightStates.push({
+    from, to, rocket: r,
+    xferTime,
+    elapsed: 0,
+    phase: 'flying',
+    flightMesh, snapshotArc,
+    captureElapsed: 0,
+    captureDuration: 90,
+    capturePer: to.radius * 3,
+    captureE0: 0.85,
+  });
+}
+
+function tickFlight(f, dt) {
+
+  if (f.phase === 'flying') {
+    f.elapsed += dt;
+
+    // Move flight mesh along the snapshotted arc
+    const t  = Math.min(f.elapsed / f.xferTime, 1);
+    const fi = t * 80;
+    const idx = Math.floor(fi), frac = fi - idx;
+    const i0 = idx * 3, i1 = Math.min(idx + 1, 80) * 3;
+    const ax = f.snapshotArc;
+    f.flightMesh.position.set(
+      ax[i0] + (ax[i1]   - ax[i0])   * frac,
+      0,
+      ax[i0+2] + (ax[i1+2] - ax[i0+2]) * frac,
+    );
+    // Orient nose toward direction of travel
+    const dx = ax[i1] - ax[i0], dz = ax[i1+2] - ax[i0+2];
+    const dl = Math.sqrt(dx*dx + dz*dz);
+    if (dl > 0) {
+      _progDir.set(dx/dl, 0, dz/dl);
+      f.flightMesh.quaternion.setFromUnitVectors(_yAxis, _progDir);
+    }
+
+    if (t >= 1) {
+      systemGroup.remove(f.flightMesh);
+      f.flightMesh = null;
+      _startCapture(f);
+    }
+
+  } else if (f.phase === 'capturing') {
+    f.captureElapsed++;
+    const t = f.captureElapsed / f.captureDuration;
+    // Quadratic ease: eccentricity shrinks from captureE0 → 0
+    const e    = f.captureE0 * (1 - t) * (1 - t);
+    const rPer = f.capturePer;
+    const newA = rPer / (1 - Math.max(e, 1e-6));
+    const r    = f.rocket;
+    r.a = newA;  r.b = newA * Math.sqrt(1 - e*e);  r.e = e;  r.c = newA * e;
+    r.speed = Math.sqrt(r.GM / (newA * newA * newA));
+
+    // Rebuild orbit ring each frame to show circularization
+    r.frame.remove(r.orbitRing);
+    r.orbitRing.geometry.dispose();
+    r.orbitRing.material.dispose();
+    r.orbitRing = buildEllipticalOrbitRing(newA, e);
+    r.orbitRing.visible = true;
+    r.frame.add(r.orbitRing);
+
+    if (t >= 1) _finalizeCapture(f);
+  }
+}
+
+function _startCapture(f) {
+  const { to, from, rocket: r } = f;
+  const e0   = f.captureE0;
+  const rPer = f.capturePer;
+  const newA = rPer / (1 - e0);
+  const newB = newA * Math.sqrt(1 - e0 * e0);
+  const newArg = to.angle + Math.PI * 0.5;
+  const newInc = (Math.random() - 0.5) * 0.25;
+
+  r.frame.removeFromParent();
+  r.frame.rotation.y = newArg;
+  r.frame.rotation.x = newInc;
+  to.planetNode.add(r.frame);
+  r.frame.visible = true;
+
+  r.a = newA;  r.b = newB;  r.e = e0;  r.c = newA * e0;
+  r.inclination = newInc;  r.argPeri = newArg;
+  r.speed = Math.sqrt(to.GM / (newA * newA * newA));
+  r.GM = to.GM;
+  r.planetRadius = to.radius;
+  r.angle = 0;   // start at periapsis — retrograde capture burn happens here
+  r.nearBody = null;  r.nearDist = Infinity;  r.osculatingElements = null;
+
+  r.frame.remove(r.orbitRing);
+  r.orbitRing.geometry.dispose();  r.orbitRing.material.dispose();
+  r.orbitRing = buildEllipticalOrbitRing(newA, e0);
+  r.orbitRing.visible = true;
+  r.frame.add(r.orbitRing);
+
+  from.rocket = null;
+  to.rocket   = r;
+
+  if (from.sidebarEntry) { const t = from.sidebarEntry.querySelector('.rocket-tag'); if (t) t.remove(); }
+  if (to.sidebarEntry && !to.sidebarEntry.querySelector('.rocket-tag')) {
+    const tag = document.createElement('span');
+    tag.className = 'rocket-tag';  tag.textContent = 'SAT';
+    to.sidebarEntry.appendChild(tag);
+  }
+
+  f.phase = 'capturing';
+}
+
+function _finalizeCapture(f) {
+  const { to, rocket: r } = f;
+  const rPer = f.capturePer;
+  r.a = rPer;  r.b = rPer;  r.e = 0;  r.c = 0;
+  r.speed = Math.sqrt(r.GM / (rPer * rPer * rPer));
+
+  r.frame.remove(r.orbitRing);
+  r.orbitRing.geometry.dispose();  r.orbitRing.material.dispose();
+  r.orbitRing = buildEllipticalOrbitRing(rPer, 0);
+  r.orbitRing.visible = showOrbits;
+  r.frame.add(r.orbitRing);
+
+  _flightStates.splice(_flightStates.indexOf(f), 1);
+
+  if (f.mission) {
+    f.mission.remaining--;
+    if (f.mission.remaining <= 0) {
+      scheduledMissions.splice(scheduledMissions.indexOf(f.mission), 1);
+    }
+    updateMissionListUI();
+    // Don't hijack the panel for automated launches
+  } else {
+    clearTransfer();
+    clearPreview();
+    clearOsculating();
+    _activePlanet = to;
+    openOrbitPanel(to);
+  }
+}
+
+// State-vector → Keplerian elements in the game's YXZ-Euler parametrisation
+function stateToElements(px, py, pz, vxW, vyW, vzW, GM) {
+  const r = Math.sqrt(px*px + py*py + pz*pz);
+  if (r < 1e-9) return null;
+  const v2 = vxW*vxW + vyW*vyW + vzW*vzW;
+  const hx = py*vzW - pz*vyW;
+  const hy = pz*vxW - px*vzW;
+  const hz = px*vyW - py*vxW;
+  const h = Math.sqrt(hx*hx + hy*hy + hz*hz);
+  if (h < 1e-9) return null;
+  const eps = v2/2 - GM/r;
+  const a = (Math.abs(eps) > 1e-12) ? -GM/(2*eps) : 1e9;
+  const rdotv = px*vxW + py*vyW + pz*vzW;
+  const ex = ((v2 - GM/r)*px - rdotv*vxW) / GM;
+  const ey = ((v2 - GM/r)*py - rdotv*vyW) / GM;
+  const ez = ((v2 - GM/r)*pz - rdotv*vzW) / GM;
+  const e = Math.sqrt(ex*ex + ey*ey + ez*ez);
+  const cosInc = -hy / h;
+  const sinIncSq = Math.max(0, 1 - cosInc*cosInc);
+  // argPeri from angular momentum vector (valid when inclined); fall back to e-vec for equatorial
+  const argPeri = sinIncSq > 0.001
+    ? Math.atan2(-hx, -hz)
+    : (e > 1e-6 ? Math.atan2(-ez, ex) : 0);
+  let sinInc = 0;
+  if (sinIncSq > 0.001) {
+    const ca = Math.cos(argPeri), sa = Math.sin(argPeri);
+    sinInc = Math.abs(ca) >= Math.abs(sa) ? -hz/(h*ca) : -hx/(h*sa);
+  } else {
+    sinInc = 0;
+  }
+  const inc = Math.atan2(sinInc, cosInc);
+  return { a, e, inclination: inc, argPeri };
+}
+
+// World-space velocity of a planet's centre (tangential, accounts for tiltGroup rotation)
+const _q_tmp = new THREE.Quaternion();
+function getBodyVel(planet) {
+  const spd = planet.speed * planet.orbitR;
+  const lv = new THREE.Vector3(-Math.sin(planet.angle)*spd, 0, Math.cos(planet.angle)*spd);
+  planet.tiltGroup.getWorldQuaternion(_q_tmp);
+  lv.applyQuaternion(_q_tmp);
+  return lv;
+}
+
+// World-space velocity of a rocket (orbital vel rotated to world + parent planet vel)
+function getRocketWorldVel(r, parentPlanet) {
+  const lv = new THREE.Vector3(
+    -r.a * Math.sin(r.angle) * r.speed,
+    0,
+    r.b * Math.cos(r.angle) * r.speed,
+  );
+  r.frame.updateWorldMatrix(true, false);
+  r.frame.getWorldQuaternion(_q_tmp);
+  lv.applyQuaternion(_q_tmp);
+  lv.add(getBodyVel(parentPlanet));
+  return lv;
+}
+
+// Rebuild the orange osculating orbit ring relative to nearBody and update panel SOI section.
+// Called every 6 animation frames when the orbit panel is open.
+function refreshOsculatingRing(r, parentPlanet) {
+  clearOsculating();
+
+  // Find nearest other planet
+  let nearBody = null, nearDist = Infinity;
+  const rPos = r.worldPos;
+  const _nb_tmp = new THREE.Vector3();
+  for (const p of planets) {
+    if (p === parentPlanet) continue;
+    p.mesh.getWorldPosition(_nb_tmp);
+    const d = _nb_tmp.distanceTo(rPos);
+    if (d < nearDist) { nearDist = d; nearBody = p; }
+  }
+  r.nearBody = nearBody;
+  r.nearDist = nearDist;
+
+  const soiSection = document.getElementById('op-soi-section');
+  if (!nearBody || nearDist > nearBody.soiRadius * 3) {
+    r.osculatingElements = null;
+    soiSection.style.display = 'none';
+    return;
+  }
+
+  // State vectors relative to nearBody
+  const nbPos = new THREE.Vector3();
+  nearBody.mesh.getWorldPosition(nbPos);
+  const px = rPos.x - nbPos.x, py = rPos.y - nbPos.y, pz = rPos.z - nbPos.z;
+  const rVel = getRocketWorldVel(r, parentPlanet);
+  const nbVel = getBodyVel(nearBody);
+  const vx = rVel.x - nbVel.x, vy = rVel.y - nbVel.y, vz = rVel.z - nbVel.z;
+
+  const el = stateToElements(px, py, pz, vx, vy, vz, nearBody.GM);
+  if (!el) { r.osculatingElements = null; soiSection.style.display = 'none'; return; }
+  r.osculatingElements = el;
+
+  // Build orange ring
+  _osculatingGroup = new THREE.Group();
+  _osculatingGroup.position.copy(nbPos);
+  _osculatingGroup.rotation.order = 'YXZ';
+  _osculatingGroup.rotation.y = el.argPeri;
+  _osculatingGroup.rotation.x = el.inclination;
+
+  const pts = [];
+  const p_sl = Math.abs(el.a * (1 - el.e * el.e));  // semi-latus rectum (positive for both cases)
+  if (el.e < 1 && el.a > 0) {
+    // Elliptic: full ring
+    const b = el.a * Math.sqrt(1 - el.e * el.e), c = el.a * el.e;
+    for (let i = 0; i <= 128; i++) {
+      const t = (i / 128) * Math.PI * 2;
+      pts.push(new THREE.Vector3(el.a * Math.cos(t) - c, 0, b * Math.sin(t)));
+    }
+  } else {
+    // Hyperbolic arc — sweep from -nuMax to +nuMax around periapsis
+    const nuMax = Math.min(2.4, Math.acos(-1 / el.e) - 0.05);
+    for (let i = 0; i <= 80; i++) {
+      const nu = -nuMax + (i / 80) * 2 * nuMax;
+      const rad = p_sl / (1 + el.e * Math.cos(nu));
+      pts.push(new THREE.Vector3(rad * Math.cos(nu), 0, rad * Math.sin(nu)));
+    }
+  }
+  _osculatingGroup.add(new THREE.Line(
+    new THREE.BufferGeometry().setFromPoints(pts),
+    new THREE.LineBasicMaterial({ color: 0xffaa00, transparent: true, opacity: 0.72 }),
+  ));
+  scene.add(_osculatingGroup);
+
+  updateOrbitPanel();
+}
+
+function showPreviewOrbit(a, e, inc, arg) {
+  clearPreview();
+  if (!_activePlanet) return;
+  const b = a * Math.sqrt(1 - e * e), c = a * e;
+  const pts = [];
+  for (let i = 0; i <= 128; i++) {
+    const t = (i / 128) * Math.PI * 2;
+    pts.push(new THREE.Vector3(a * Math.cos(t) - c, 0, b * Math.sin(t)));
+  }
+  const ring = new THREE.Line(
+    new THREE.BufferGeometry().setFromPoints(pts),
+    new THREE.LineBasicMaterial({ color: 0xff3300, transparent: true, opacity: 0.80 }),
+  );
+  _previewGroup = new THREE.Group();
+  _previewGroup.rotation.order = 'YXZ';
+  _previewGroup.rotation.y = arg;
+  _previewGroup.rotation.x = inc;
+  _previewGroup.add(ring);
+  _activePlanet.planetNode.add(_previewGroup);
+}
+
+// ── Maneuver delta-V calculator ───────────────────────────
+function computeManeuverDv(r, a2, e2, inc2, arg2) {
+  const {GM, a: a1, e: e1, inclination: inc1, argPeri: arg1, planetRadius: pR} = r;
+  e2 = Math.min(Math.max(0, e2), Math.max(0, 1 - pR * 1.15 / a2));
+
+  const vv = (rPt, a) => {
+    const v2 = GM * (2 / rPt - 1 / a);
+    return v2 > 0 ? Math.sqrt(v2) : 0;
+  };
+
+  const per1 = a1*(1-e1), apo1 = a1*(1+e1);
+  const per2 = a2*(1-e2), apo2 = a2*(1+e2);
+
+  // Two-burn Hohmann transfers: try per1→apo2 and apo1→per2, take minimum
+  let dvOrbit = Infinity;
+  for (const [rA, rB, aFrom, aTo] of [
+    [per1, apo2, a1, a2],
+    [apo1, per2, a1, a2],
+  ]) {
+    if (rA <= 0 || rB <= 0 || rA === rB) continue;
+    const rLo = Math.min(rA, rB), rHi = Math.max(rA, rB);
+    const at = (rLo + rHi) / 2;
+    const dv = Math.abs(vv(rA, at) - vv(rA, aFrom))
+             + Math.abs(vv(rB, aTo) - vv(rB, at));
+    if (isFinite(dv)) dvOrbit = Math.min(dvOrbit, dv);
+  }
+  if (!isFinite(dvOrbit)) dvOrbit = Math.abs(Math.sqrt(GM/a2) - Math.sqrt(GM/a1));
+
+  // Plane change at apoapsis of target orbit (slowest point = cheapest)
+  const dvPlane = 2 * vv(apo2, a2) * Math.abs(Math.sin((inc2 - inc1) / 2));
+
+  // Argument-of-periapsis rotation (scales with eccentricity, free for circles)
+  let dArg = ((arg2 - arg1) % (2*Math.PI) + 2*Math.PI) % (2*Math.PI);
+  if (dArg > Math.PI) dArg = 2*Math.PI - dArg;
+  const dvArg = Math.sqrt(GM / a2) * 2 * Math.sin(dArg / 2) * ((e1 + e2) / 2);
+
+  return dvOrbit + dvPlane + dvArg;
+}
+
+// ── Orbit panel open / live-update ────────────────────────
+function _syncEccMax(a, pR) {
+  const sl = document.getElementById('sl-ecc');
+  const eMax = Math.min(0.97, Math.max(0, 1 - pR * 1.15 / a)).toFixed(3);
+  sl.max = eMax;
+  if (parseFloat(sl.value) > parseFloat(eMax)) sl.value = eMax;
+}
+
+function updateOrbitPanel() {
+  if (!_activePlanet) return;
+  const r = _activePlanet.rocket;
+
+  const a2   = parseFloat(document.getElementById('sl-sma').value);
+  _syncEccMax(a2, r.planetRadius);
+  const e2   = parseFloat(document.getElementById('sl-ecc').value);
+  const inc2 = parseFloat(document.getElementById('sl-inc').value) * Math.PI / 180;
+  const arg2 = parseFloat(document.getElementById('sl-arg').value) * Math.PI / 180;
+
+  // Clamp e2 for derived calcs
+  const e2c = Math.min(e2, parseFloat(document.getElementById('sl-ecc').max));
+
+  document.getElementById('op-sma-val').textContent = a2.toFixed(2) + ' u';
+  document.getElementById('op-ecc-val').textContent = e2c.toFixed(4);
+  document.getElementById('op-inc-val').textContent = (inc2 * 180/Math.PI).toFixed(2) + '°';
+  document.getElementById('op-arg-val').textContent = (arg2 * 180/Math.PI).toFixed(2) + '°';
+
+  document.getElementById('op-apo-new').textContent = (a2*(1+e2c) - r.planetRadius).toFixed(2) + ' u';
+  document.getElementById('op-per-new').textContent = (a2*(1-e2c) - r.planetRadius).toFixed(2) + ' u';
+
+  const cost      = computeManeuverDv(r, a2, e2c, inc2, arg2);
+  const remaining = r.deltav - r.usedDV;
+  const canAfford = cost <= remaining + 1e-9;
+
+  document.getElementById('op-cost').textContent   = cost.toFixed(3) + ' Δv';
+  document.getElementById('op-cost').style.color   = canAfford ? '#4af' : '#f55';
+  document.getElementById('op-budget').textContent = remaining.toFixed(3) + ' / ' + r.deltav.toFixed(3) + ' Δv';
+
+  const usedFrac = Math.min(1, r.usedDV / r.deltav);
+  const costFrac = Math.min(1 - usedFrac, cost / r.deltav);
+  document.getElementById('op-bar-used').style.width = (usedFrac * 100).toFixed(1) + '%';
+  document.getElementById('op-bar-cost').style.width = (costFrac * 100).toFixed(1) + '%';
+
+  const btn = document.getElementById('op-execute');
+  btn.disabled = !canAfford;
+  btn.style.opacity = canAfford ? '1' : '0.35';
+
+  if (cost > 1e-4) showPreviewOrbit(a2, e2c, inc2, arg2);
+  else clearPreview();
+
+  // ── SOI section ───────────────────────────────────────────
+  const soiSection = document.getElementById('op-soi-section');
+  const el = r.osculatingElements;
+  const nb = r.nearBody;
+  if (!nb || !el) { soiSection.style.display = 'none'; return; }
+
+  soiSection.style.display = 'block';
+  document.getElementById('op-soi-name').textContent = nb.name;
+  document.getElementById('op-soi-dist').textContent =
+    r.nearDist.toFixed(1) + ' u (SOI ' + nb.soiRadius.toFixed(1) + ')';
+  document.getElementById('op-soi-ecc').textContent = el.e.toFixed(4);
+
+  const bound = el.e < 1 && el.a > 0;
+  const rPer = bound ? el.a * (1 - el.e) : Math.abs(el.a) * (el.e - 1);
+  document.getElementById('op-soi-per').textContent = (rPer - nb.radius).toFixed(2) + ' u';
+
+  const apoRow = document.getElementById('op-soi-apo-row');
+  apoRow.style.display = bound ? '' : 'none';
+  if (bound) document.getElementById('op-soi-apo').textContent = (el.a*(1+el.e) - nb.radius).toFixed(2) + ' u';
+
+  const vPer   = rPer > 1e-6 ? Math.sqrt(nb.GM * (2/rPer - 1/el.a)) : 0;
+  const vCirc  = rPer > 1e-6 ? Math.sqrt(nb.GM / rPer) : 0;
+  const capDV  = Math.abs(vPer - vCirc);
+  const capEl  = document.getElementById('op-soi-capv');
+  capEl.textContent = capDV.toFixed(3) + ' Δv';
+
+  const remBudget  = r.deltav - r.usedDV;
+  const canCapture = capDV <= remBudget + 1e-9 && rPer > nb.radius * 1.05;
+  const capBtn = document.getElementById('op-capture');
+  capBtn.disabled = !canCapture;
+  capBtn.style.opacity = canCapture ? '1' : '0.35';
+  capEl.style.color = canCapture ? '#4af' : '#f55';
+}
+
+function openOrbitPanel(planet) {
+  if (!planet.rocket && planet !== homePlanet) return;
+  _activePlanet = planet;
+
+  const hasRocket = !!planet.rocket;
+  document.getElementById('op-no-rocket').style.display    = hasRocket ? 'none'  : 'block';
+  document.getElementById('op-rocket-content').style.display = hasRocket ? 'block' : 'none';
+  document.getElementById('orbit-panel').style.display = 'block';
+  document.getElementById('op-planet').textContent = planet.name;
+
+  // Mission queue section: visible on home planet only
+  const isHome = planet === homePlanet;
+  const missionSection = document.getElementById('op-mission-section');
+  missionSection.style.display = isHome ? 'block' : 'none';
+  if (isHome) {
+    const mDest = document.getElementById('op-mission-dest');
+    mDest.innerHTML = '<option value="">— destination —</option>';
+    planets.forEach((p, i) => {
+      if (p !== planet) {
+        const opt = document.createElement('option');
+        opt.value = i; opt.textContent = `${p.name} (${p.label})`;
+        mDest.appendChild(opt);
+      }
+    });
+    updateMissionListUI();
+  }
+
+  if (!hasRocket) return;
+
+  const r = planet.rocket;
+
+  // Populate transfer target dropdown with all other planets
+  clearTransfer();
+  const sel = document.getElementById('op-transfer-target');
+  sel.innerHTML = '<option value="">— select destination —</option>';
+  planets.forEach((p, i) => {
+    if (p !== planet) {
+      const opt = document.createElement('option');
+      opt.value = i;
+      opt.textContent = `${p.name} (${p.label})`;
+      sel.appendChild(opt);
+    }
+  });
+
+  document.getElementById('op-planet').textContent  = planet.name;
+  document.getElementById('op-sma-cur').textContent = r.a.toFixed(2) + ' u';
+  document.getElementById('op-ecc-cur').textContent = r.e.toFixed(4);
+  document.getElementById('op-inc-cur').textContent = (r.inclination * 180/Math.PI).toFixed(2) + '°';
+  document.getElementById('op-arg-cur').textContent = (r.argPeri     * 180/Math.PI).toFixed(2) + '°';
+  document.getElementById('op-apo-cur').textContent = (r.a*(1+r.e) - r.planetRadius).toFixed(2) + ' u';
+  document.getElementById('op-per-cur').textContent = (r.a*(1-r.e) - r.planetRadius).toFixed(2) + ' u';
+
+  const slSma = document.getElementById('sl-sma');
+  slSma.min   = (r.planetRadius * 1.5).toFixed(2);
+  slSma.max   = (r.a * 4.0).toFixed(2);
+  slSma.step  = (r.a * 0.005).toFixed(3);
+  slSma.value = r.a;
+
+  _syncEccMax(r.a, r.planetRadius);
+  document.getElementById('sl-ecc').value = r.e;
+  document.getElementById('sl-inc').value = (r.inclination * 180/Math.PI).toFixed(2);
+  document.getElementById('sl-arg').value = (r.argPeri     * 180/Math.PI).toFixed(2);
+
+  updateOrbitPanel();
+}
+
+document.getElementById('op-close').addEventListener('click', () => {
+  clearPreview();
+  clearOsculating();
+  clearTransfer();
+  _activePlanet = null;
+  document.getElementById('orbit-panel').style.display = 'none';
+});
+
+['sl-sma','sl-ecc','sl-inc','sl-arg'].forEach(id =>
+  document.getElementById(id).addEventListener('input', updateOrbitPanel)
+);
+
+document.getElementById('op-transfer-target').addEventListener('change', function () {
+  if (!_activePlanet || !this.value) { clearTransfer(); return; }
+  const target = planets[parseInt(this.value)];
+  if (target) drawTransfer(_activePlanet, target);
+});
+
+document.getElementById('op-mission-queue').addEventListener('click', () => {
+  const idx = parseInt(document.getElementById('op-mission-dest').value);
+  const count = Math.max(1, parseInt(document.getElementById('op-mission-count').value) || 1);
+  if (isNaN(idx) || !planets[idx]) return;
+  scheduleMission(planets[idx], count);
+});
+
+document.getElementById('op-mission-list').addEventListener('click', e => {
+  const id = parseInt(e.target.dataset.cancel);
+  if (!isNaN(id)) cancelMission(id);
+});
+
+document.getElementById('op-spawn').addEventListener('click', () => {
+  if (!homePlanet) return;
+  spawnRocket(homePlanet);
+  openOrbitPanel(homePlanet);
+});
+
+document.getElementById('op-xfer-skip').addEventListener('click', skipToWindow);
+document.getElementById('op-xfer-execute').addEventListener('click', executeTransfer);
+
+document.getElementById('op-execute').addEventListener('click', () => {
+  if (!_activePlanet) return;
+  const r = _activePlanet.rocket;
+
+  const a2   = parseFloat(document.getElementById('sl-sma').value);
+  const e2   = Math.min(parseFloat(document.getElementById('sl-ecc').value),
+                        parseFloat(document.getElementById('sl-ecc').max));
+  const inc2 = parseFloat(document.getElementById('sl-inc').value) * Math.PI / 180;
+  const arg2 = parseFloat(document.getElementById('sl-arg').value) * Math.PI / 180;
+
+  const cost = computeManeuverDv(r, a2, e2, inc2, arg2);
+  if (cost > r.deltav - r.usedDV + 1e-9) return;
+
+  r.usedDV += cost;
+  r.a = a2;  r.e = e2;  r.c = a2 * e2;
+  r.b = a2 * Math.sqrt(1 - e2 * e2);
+  r.inclination = inc2;  r.argPeri = arg2;
+
+  r.frame.rotation.y = arg2;
+  r.frame.rotation.x = inc2;
+
+  r.frame.remove(r.orbitRing);
+  r.orbitRing.geometry.dispose();
+  r.orbitRing.material.dispose();
+  r.orbitRing = buildEllipticalOrbitRing(a2, e2);
+  r.orbitRing.visible = showOrbits;
+  r.frame.add(r.orbitRing);
+
+  // Also update speed to stay Keplerian-consistent with new semi-major axis
+  r.speed = Math.sqrt(r.GM / (a2 * a2 * a2));
+
+  clearPreview();
+  clearOsculating();
+  openOrbitPanel(_activePlanet);
+});
+
+document.getElementById('op-capture').addEventListener('click', () => {
+  if (!_activePlanet?.rocket?.osculatingElements) return;
+  const r  = _activePlanet.rocket;
+  const nb = r.nearBody;
+  const el = r.osculatingElements;
+  if (!nb || !el) return;
+
+  const bound = el.e < 1 && el.a > 0;
+  const rPer  = bound ? el.a*(1-el.e) : Math.abs(el.a)*(el.e-1);
+  if (rPer <= nb.radius * 1.05) return;
+
+  const vPer  = Math.sqrt(nb.GM * (2/rPer - 1/el.a));
+  const vCirc = Math.sqrt(nb.GM / rPer);
+  const capDV = Math.abs(vPer - vCirc);
+  if (capDV > r.deltav - r.usedDV + 1e-9) return;
+
+  // Deduct ΔV
+  r.usedDV += capDV;
+
+  // New circular orbit at periapsis of the osculating orbit
+  const newA = rPer, newE = 0;
+  const newInc = el.inclination, newArg = el.argPeri;
+  const newSpeed = Math.sqrt(nb.GM / (newA * newA * newA));
+
+  // Transfer rocket frame from old planet to new one
+  const oldPlanet = _activePlanet;
+  r.frame.removeFromParent();
+  nb.planetNode.add(r.frame);
+
+  // Update rocket properties
+  r.a = newA;  r.e = newE;  r.b = newA;  r.c = 0;
+  r.inclination = newInc;  r.argPeri = newArg;
+  r.speed = newSpeed;
+  r.GM = nb.GM;
+  r.planetRadius = nb.radius;
+  r.angle = 0;  // start at periapsis
+  r.nearBody = null;  r.nearDist = Infinity;  r.osculatingElements = null;
+
+  // Update frame orientation
+  r.frame.rotation.y = newArg;
+  r.frame.rotation.x = newInc;
+
+  // Rebuild orbit ring
+  r.frame.remove(r.orbitRing);
+  r.orbitRing.geometry.dispose();
+  r.orbitRing.material.dispose();
+  r.orbitRing = buildEllipticalOrbitRing(newA, newE);
+  r.orbitRing.visible = showOrbits;
+  r.frame.add(r.orbitRing);
+
+  // Transfer planet.rocket ownership
+  oldPlanet.rocket = null;
+  nb.rocket = r;
+
+  // Update sidebar badges
+  if (oldPlanet.sidebarEntry) {
+    const tag = oldPlanet.sidebarEntry.querySelector('.rocket-tag');
+    if (tag) tag.remove();
+  }
+  if (nb.sidebarEntry && !nb.sidebarEntry.querySelector('.rocket-tag')) {
+    const tag = document.createElement('span');
+    tag.className = 'rocket-tag';
+    tag.textContent = 'SAT';
+    nb.sidebarEntry.appendChild(tag);
+  }
+
+  clearPreview();
+  clearOsculating();
+  _activePlanet = nb;
+  openOrbitPanel(nb);
+});
+
+renderer.domElement.addEventListener('mousedown', e => { _mdownX = e.clientX; _mdownY = e.clientY; });
+renderer.domElement.addEventListener('click', e => {
+  if (Math.hypot(e.clientX - _mdownX, e.clientY - _mdownY) > 4) return;
+  _mouse.x =  (e.clientX / innerWidth)  * 2 - 1;
+  _mouse.y = -(e.clientY / innerHeight) * 2 + 1;
+  raycaster.setFromCamera(_mouse, camera);
+  const hits = raycaster.intersectObjects(planets.map(p => p.mesh));
+  if (hits.length) {
+    const planet = planets.find(p => p.mesh === hits[0].object);
+    if (planet?.rocket || planet === homePlanet) openOrbitPanel(planet);
+  }
+});
+
+window.addEventListener('resize', () => {
+  camera.aspect = innerWidth / innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth, innerHeight);
+});
+</script>
+</body>
+</html>
