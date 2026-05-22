@@ -92,7 +92,7 @@ A standalone browser game. No build step, no server, no dependencies beyond a CD
 
 ## Architecture notes
 
-- `narrative.js` is a **black box**. Game logic belongs in `colony_data.js` (data) and `index.html` (wiring). Never modify narrative.js.
+- `narrative.js` is the game-agnostic simulation engine. It has no knowledge of colonies, rockets, or UI. Game logic belongs in `colony_data.js` (data) and `index.html` (wiring). Modify it only to fix engine-level behaviour — not to add game-specific logic.
 - `colony_data.js` exports four things used by `index.html`: `TRANSFER_LEVELS`, `makeFactions()`, `EVENT_EFFECTS`, `EVENT_FLAVORS`, `makeActions()`, `makeColonyWorld()`.
 - All gameplay constants (`TICK_INTERVAL`, `STRUCTURES`, `COMMS_UPGRADES`, `PLAYER_ACTIONS`, `RANDOM_EVENTS`, `ORBIT_WINDOW_LEAD`) live in `index.html`.
 - Random events use a declarative `needs` object. Add new precondition types by extending `_checkNeeds()` — the rest of `tickRandomEvents()` does not need to change.
