@@ -71,6 +71,10 @@ class Faction {
     for (const d of this.dispositions) {
       if (this.scores[d] > bestScore) { bestScore = this.scores[d]; best = d; }
     }
+    // Hysteresis: require a 0.06 margin above the current disposition to trigger a flip.
+    // Prevents rapid oscillation when two scores are nearly equal.
+    const held = this._last_disposition;
+    if (held && best !== held && bestScore < (this.scores[held] ?? 0) + 0.06) return held;
     return best;
   }
 
@@ -79,7 +83,7 @@ class Faction {
       this.scores[disposition] = Math.max(0, Math.min(1, this.scores[disposition] + delta));
   }
 
-  decay(rate = 0.02) {
+  decay(rate = 0.015) {
     for (const d of this.dispositions)
       if (this.scores[d] > 0.01)
         this.scores[d] = Math.max(0, this.scores[d] * (1 - rate));

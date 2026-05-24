@@ -13,7 +13,7 @@ const TRANSFER_LEVELS = [
 
 // ── Factions ──────────────────────────────────────────────────────────────────
 
-function makeFactions() {
+function makeHomeFactions() {
   return [
     new Faction({
       id: 'gov', name: 'Government',
@@ -25,6 +25,11 @@ function makeFactions() {
       dispositions: ['bullish', 'neutral', 'skeptical', 'hostile'],
       attrs: { funding_level: 100 },
     }),
+  ];
+}
+
+function makeColonyFactions() {
+  return [
     new Faction({
       id: 'miners', name: 'Miners Union',
       dispositions: ['content', 'restless', 'striking', 'revolutionary'],
@@ -81,6 +86,16 @@ const EVENT_FLAVORS = {
   synths_escape: '',
   gov_sanctions: '',
   investor_funding_cut: '',
+  bribe_government:
+    'Internal audit flags an unexplained transfer to a senior Colonial Authority official. The company denies any impropriety.',
+  miners_crushed:
+    'SUPPRESSION CONFIRMED: Colonial security forces have conducted coordinated operations across all worker districts. Union leadership detained. Communication blackout in effect.',
+  crush_miners_failed:
+    'OPERATION FAILED: Security sweep met armed resistance. Workers have seized colonial administration. Militia commander Dax Obuobi: "This colony is ours now."',
+  government_overthrown:
+    "A chartered transport carrying colonial workers has landed at Colonial Authority headquarters. Within six hours the building is occupied. The incumbent director has resigned. A company spokesman states: 'The transition was entirely peaceful.'",
+  local_government_established:
+    'Colonial Authority recognises the formation of a colonial council with elected representation. The company retains operational control of mining assets.',
   synth_refuses_order: '',
   synth_creates_art: '',
   synth_memory_sharing: '',
@@ -189,7 +204,7 @@ const EVENT_EFFECTS = {
   mission_success: {
     gov:       { supportive: +0.30, suspicious: -0.10 },
     investors: { bullish: +0.30, skeptical: -0.10 },
-    miners:    { content: +0.10 },
+    miners:    { content: +0.35 },
   },
   mission_failure: {
     gov:       { suspicious: +0.20, supportive: -0.20 },
@@ -203,7 +218,7 @@ const EVENT_EFFECTS = {
     synths:    { aware: +0.10 },
   },
   increase_work_hours: {
-    miners:    { restless: +0.35, content: -0.20, striking: +0.10 },
+    miners:    { striking: +0.15, revolutionary: +0.25, content: -0.20 },
     synths:    { aware: +0.15 },
     investors: { bullish: +0.10 },
   },
@@ -215,8 +230,7 @@ const EVENT_EFFECTS = {
   },
   synths_deployed: {
     miners:    { restless: +0.25, striking: +0.10 },
-    synths:    { aware: +0.35 },
-    investors: { bullish: +0.20 },
+    investors: { skeptical: +0.10 },
     gov:       { suspicious: +0.10 },
   },
   military_deployed: {
@@ -271,6 +285,7 @@ const EVENT_EFFECTS = {
   miner_strike: {
     gov:       { suspicious: +0.20 },
     investors: { hostile: +0.20, skeptical: +0.20 },
+    miners:    { striking: +0.05, revolutionary: +0.03 },
   },
   miner_terror_attack: {
     gov:       { hostile: +0.50 },
@@ -280,6 +295,7 @@ const EVENT_EFFECTS = {
   sabotage: {
     gov:       { hostile: +0.30 },
     investors: { hostile: +0.30, skeptical: +0.20 },
+    miners:    { revolutionary: +0.05 },
   },
   mass_casualties: {
     gov:       { hostile: +0.80 },
@@ -291,7 +307,7 @@ const EVENT_EFFECTS = {
     miners:    { restless: +0.20, revolutionary: +0.10 },
     gov:       { suspicious: +0.40 },
     investors: { skeptical: +0.20 },
-    synths:    { organized: +0.50, aware: +0.30 },
+    synths:    { organized: +0.20, free: +0.20 },
   },
   synths_escape: {
     gov:       { hostile: +0.50, suspicious: +0.20 },
@@ -300,32 +316,66 @@ const EVENT_EFFECTS = {
   },
   synth_refuses_order: {
     gov:       { suspicious: +0.30, watchful: +0.20 },
-    investors: { skeptical: +0.20 },
+    investors: { skeptical: +0.08 },
     miners:    { restless: +0.10 },
     synths:    { organized: +0.20, aware: +0.15 },
   },
   synth_creates_art: {
     gov:       { watchful: +0.10, suspicious: +0.05 },
-    investors: {},
+    investors: { bullish: +0.06 },
     miners:    { restless: -0.10, content: +0.05 },
     synths:    { aware: +0.20 },
   },
   synth_memory_sharing: {
     gov:       { suspicious: +0.25, hostile: +0.10 },
-    investors: { skeptical: +0.15 },
     miners:    { restless: +0.10 },
-    synths:    { organized: +0.30 },
+    synths:    { organized: +0.15 },
   },
   colonial_independence_referendum: {
     gov:       { hostile: +0.40, suspicious: +0.20 },
     investors: { hostile: +0.20, skeptical: +0.20 },
-    miners:    { content: +0.10 },
+    miners:    { content: +0.10, revolutionary: +0.30 },
     synths:    { aware: +0.15 },
   },
   colonial_militia_formed: {
     gov:       { suspicious: +0.20, hostile: +0.10 },
     investors: { skeptical: +0.15 },
+    miners:    { revolutionary: +0.20 },
     synths:    { organized: +0.10 },
+  },
+  government_overthrown: {
+    gov:       { supportive: +1.0, suspicious: -0.60, hostile: -0.60, watchful: -0.30 },
+    investors: { hostile: +0.50, skeptical: +0.30 },
+    miners:    { content: +0.30 },
+    synths:    { organized: +0.15 },
+  },
+  profit_report_high: {
+    investors: { bullish: +0.30, skeptical: -0.15 },
+  },
+  profit_report_medium: {
+    investors: { bullish: +0.12 },
+  },
+  profit_report_low: {
+    investors: { skeptical: +0.15 },
+  },
+  bribe_government: {
+    gov:       { supportive: +0.15, suspicious: -0.35, hostile: -0.20, watchful: -0.10 },
+    investors: { skeptical: +0.10 },
+  },
+  miners_crushed: {
+    gov:       { suspicious: +0.40, hostile: +0.30 },
+    investors: { bullish: +0.30 },
+    miners:    { content: +1.0 },
+  },
+  crush_miners_failed: {
+    gov:       { hostile: +0.50, suspicious: +0.20 },
+    investors: { skeptical: +0.40, hostile: +0.15 },
+    miners:    { revolutionary: +0.80, striking: +0.20 },
+  },
+  local_government_established: {
+    gov:       { supportive: +0.25, suspicious: -0.20 },
+    investors: { skeptical: +0.25, hostile: +0.10 },
+    miners:    { content: +0.60, revolutionary: -0.40 },
   },
   gov_sanctions: {
     investors: { skeptical: +0.20, hostile: +0.10 },
@@ -335,8 +385,8 @@ const EVENT_EFFECTS = {
     miners:    { restless: +0.20 },
   },
   government_policy_favorable: {
-    gov:       { supportive: +0.30 },
-    investors: { neutral: +0.10 },
+    gov:       { supportive: +0.30, suspicious: -0.10 },
+    investors: { bullish: +0.20, skeptical: -0.10 },
     miners:    { content: +0.10 },
     synths:    { aware: +0.05 },
   },
@@ -347,14 +397,14 @@ const EVENT_EFFECTS = {
     synths:    { organized: +0.10 },
   },
   media_expose: {
-    gov:       { suspicious: +0.30, hostile: +0.10 },
-    investors: { skeptical: +0.20, hostile: +0.10 },
+    gov:       { suspicious: +0.20, hostile: +0.05 },
+    investors: { skeptical: +0.20, hostile: +0.05 },
     miners:    { content: +0.10 },
     synths:    { aware: +0.10 },
   },
   whistleblower_defects: {
-    gov:       { suspicious: +0.20, watchful: +0.20 },
-    investors: { skeptical: +0.20, hostile: +0.10 },
+    gov:       { suspicious: +0.12, watchful: +0.10 },
+    investors: { skeptical: +0.15, hostile: +0.05 },
     miners:    { content: +0.10 },
     synths:    { aware: +0.10 },
   },
@@ -390,7 +440,7 @@ const EVENT_EFFECTS = {
   mining_accident: {
     gov:       { suspicious: +0.25 },
     investors: { skeptical: +0.15 },
-    miners:    { restless: +0.30, content: -0.20 },
+    miners:    { restless: +0.25, content: -0.20 },
     synths:    { aware: +0.10 },
   },
   solar_flare: {},  // base event — no faction effects; see solar_flare_unrest for conditional escalation
@@ -400,13 +450,13 @@ const EVENT_EFFECTS = {
   },
   resource_vein_discovered: {
     gov:       { supportive: +0.20 },
-    investors: { bullish: +0.30 },
+    investors: { bullish: +0.40 },
     miners:    { content: +0.20 },
     synths:    { aware: +0.05 },
   },
   resource_vein_depleted: {
     gov:       { watchful: +0.15 },
-    investors: { skeptical: +0.30, bullish: -0.20 },
+    investors: { skeptical: +0.18, bullish: -0.10 },
     miners:    { restless: +0.25, striking: +0.10 },
     synths:    { aware: +0.10, organized: +0.05 },
   },
@@ -506,12 +556,12 @@ const EVENT_EFFECTS = {
   },
   safety_improvements: {
     gov:       { supportive: +0.20 },
-    investors: { skeptical: +0.15 },
+    investors: { skeptical: +0.08 },
     miners:    { content: +0.25 },
   },
   hire_more_workers: {
     gov:       { supportive: +0.10 },
-    investors: { skeptical: +0.20 },
+    investors: { skeptical: +0.10 },
     miners:    { content: +0.20 },
     synths:    { aware: +0.10 },
   },
@@ -524,13 +574,13 @@ const EVENT_EFFECTS = {
   workforce_automation: {
     gov:       { watchful: +0.10 },
     investors: { bullish: +0.35 },
-    miners:    { restless: +0.35, striking: +0.15 },
+    miners:    { striking: +0.20, revolutionary: +0.20 },
     synths:    { aware: +0.20 },
   },
   benefits_cut: {
     gov:       { suspicious: +0.20 },
     investors: { bullish: +0.20 },
-    miners:    { revolutionary: +0.30, restless: +0.20 },
+    miners:    { revolutionary: +0.50, content: -0.15 },
     synths:    { aware: +0.15 },
   },
   environmental_protection: {
@@ -541,13 +591,13 @@ const EVENT_EFFECTS = {
   },
   cooperate_with_investigation: {
     gov:       { suspicious: -0.25, supportive: +0.10 },
-    investors: { skeptical: +0.20 },
+    investors: { skeptical: +0.10 },
     miners:    { content: +0.15 },
     synths:    { aware: +0.05 },
   },
   human_rights_audit: {
     gov:       { supportive: +0.25 },
-    investors: { skeptical: +0.20 },
+    investors: { skeptical: +0.10 },
     miners:    { content: +0.20 },
     synths:    { organized: +0.15 },
   },
@@ -559,13 +609,13 @@ const EVENT_EFFECTS = {
   },
   synth_awareness_acknowledged: {
     gov:       { suspicious: +0.30 },
-    investors: { hostile: +0.20 },
+    investors: { skeptical: +0.12 },
     miners:    { restless: +0.20 },
     synths:    { organized: +0.30 },
   },
   synth_limited_rights: {
     gov:       { suspicious: +0.20 },
-    investors: { hostile: +0.25 },
+    investors: { skeptical: +0.10 },
     miners:    { restless: +0.20 },
     synths:    { organized: +0.25, free: -0.10 },
   },
@@ -591,7 +641,7 @@ const EVENT_EFFECTS = {
 
 // ── Actions ───────────────────────────────────────────────────────────────────
 
-function makeActions() {
+function makeHomeActions() {
   const actions = [];
 
   // ── Government ──────────────────────────────────────────────────────────────
@@ -627,7 +677,7 @@ function makeActions() {
   actions.push(new Action({
     name: 'issue_fine', faction_id: 'gov', disposition: 'suspicious',
     weight: 0.6, cooldown: 6,
-    effects: [(w) => { w.attrs.player_funds = (w.attrs.player_funds ?? 1000) - 100; return []; }],
+    effects: [(w) => { w.attrs.player_funds = (w.attrs.player_funds ?? 1000) - 40; return []; }],
     flavor: "'This behaviour will not go unaddressed.' A financial penalty has been levied against company colonial operations.",
   }));
 
@@ -668,6 +718,7 @@ function makeActions() {
   actions.push(new Action({
     name: 'hold_position', faction_id: 'investors', disposition: 'neutral',
     weight: 1.0, cooldown: 2,
+    effects: [(w, f) => { f.shift('bullish', 0.04); return []; }],
     flavor: "'We are watching developments closely before any further commitment.' — Investor consortium statement to shareholders",
   }));
 
@@ -712,11 +763,18 @@ function makeActions() {
     flavor: "'The assets are worth saving even if the management is not.' Consortium initiates hostile acquisition proceedings.",
   }));
 
+  return actions;
+}
+
+function makeColonyActions() {
+  const actions = [];
+
   // ── Miners Union ────────────────────────────────────────────────────────────
 
   actions.push(new Action({
     name: 'work_overtime', faction_id: 'miners', disposition: 'content',
     weight: 0.5, cooldown: 3,
+    preconditions: [(w) => !w.attrs.miners_suppressed && !w.attrs.miners_militia],
     effects: [(w) => { w.attrs.production_bonus = (w.attrs.production_bonus ?? 0) + 0.1; return []; }],
     flavor: "'We believe in this mission.' Workers volunteer for additional shifts. Colonial output climbs above projection.",
   }));
@@ -724,14 +782,15 @@ function makeActions() {
   actions.push(new Action({
     name: 'form_union', faction_id: 'miners', disposition: 'restless',
     weight: 0.7, cooldown: 8,
-    preconditions: [(w, f) => !f.attrs.organized],
-    effects: [(w, f) => { f.attrs.organized = true; w.factions['gov'].shift('watchful', 0.10); return []; }],
+    preconditions: [(w, f) => !f.attrs.organized, (w) => !w.attrs.miners_suppressed && !w.attrs.miners_militia],
+    effects: [(w, f) => { f.attrs.organized = true; w.factions['gov']?.shift('watchful', 0.10); return []; }],
     flavor: "'United we negotiate, divided we suffer.' The Colonial Workers Union holds its first formal election. Turnout: 94%.",
   }));
 
   actions.push(new Action({
     name: 'work_slowdown', faction_id: 'miners', disposition: 'restless',
     weight: 0.8, cooldown: 4,
+    preconditions: [(w) => !w.attrs.miners_suppressed && !w.attrs.miners_militia],
     effects: [(w) => { w.attrs.production_bonus = (w.attrs.production_bonus ?? 0) - 0.15; return []; }],
     flavor: "'We do exactly what the contract specifies. Nothing more.' Output falls across colonial facilities as workers refuse all unpaid tasks.",
   }));
@@ -739,6 +798,7 @@ function makeActions() {
   actions.push(new Action({
     name: 'go_on_strike', faction_id: 'miners', disposition: 'striking',
     weight: 0.9, cooldown: 6,
+    preconditions: [(w) => !w.attrs.miners_suppressed && !w.attrs.miners_militia],
     effects: [(w) => [new NEvent('miner_strike', { source: 'miners',
       flavor: "'Not one more hour.' Drills fall silent across the colonial grid. Union leadership: 'We will not return until our demands are met.'",
     })]],
@@ -748,8 +808,9 @@ function makeActions() {
   actions.push(new Action({
     name: 'public_protest', faction_id: 'miners', disposition: 'striking',
     weight: 0.7, cooldown: 5,
+    preconditions: [(w) => !w.attrs.miners_suppressed && !w.attrs.miners_militia],
     effects: [(w) => {
-      w.factions['gov'].shift('suspicious', 0.15);
+      w.factions['gov']?.shift('suspicious', 0.15);
       return [new NEvent('miner_strike', { source: 'miners', magnitude: 0.5,
         flavor: "Workers stage demonstrations outside colonial administration. 'The whole system is watching,' says union organiser Yeva Marchetti.",
       })];
@@ -760,7 +821,7 @@ function makeActions() {
   actions.push(new Action({
     name: 'call_for_independence', faction_id: 'miners', disposition: 'striking',
     weight: 0.5, cooldown: 20,
-    preconditions: [(w, f) => !!f.attrs.organized],
+    preconditions: [(w, f) => !!f.attrs.organized, (w) => !w.attrs.miners_suppressed && !w.attrs.miners_militia],
     effects: [(w) => [new NEvent('colonial_independence_referendum', { source: 'miners',
       flavor: "Ballot papers are distributed across all colonial sectors. The question: 'Should this colony govern itself?' Company legal has filed an immediate injunction. It has been ignored.",
     })]],
@@ -770,6 +831,7 @@ function makeActions() {
   actions.push(new Action({
     name: 'sabotage_equipment', faction_id: 'miners', disposition: 'revolutionary',
     weight: 0.8, cooldown: 5,
+    preconditions: [(w) => !w.attrs.miners_suppressed && !w.attrs.miners_militia],
     effects: [(w) => [new NEvent('sabotage', { source: 'miners',
       flavor: "Equipment failures cascade across Sector 7. Engineers report 'clear signs of deliberate tampering.' No group claims responsibility.",
     })]],
@@ -779,7 +841,7 @@ function makeActions() {
   actions.push(new Action({
     name: 'form_militia', faction_id: 'miners', disposition: 'revolutionary',
     weight: 0.5, cooldown: 12,
-    preconditions: [(w, f) => !!f.attrs.organized, (w, f) => !f.attrs.armed],
+    preconditions: [(w, f) => !!f.attrs.organized, (w, f) => !f.attrs.armed, (w) => !w.attrs.miners_suppressed && !w.attrs.miners_militia],
     effects: [(w, f) => {
       f.attrs.armed = true;
       return [new NEvent('colonial_militia_formed', { source: 'miners',
@@ -792,7 +854,7 @@ function makeActions() {
   actions.push(new Action({
     name: 'terror_attack', faction_id: 'miners', disposition: 'revolutionary',
     weight: 0.4, cooldown: 12,
-    preconditions: [(w, f) => !!f.attrs.organized],
+    preconditions: [(w, f) => !!f.attrs.organized, (w) => !w.attrs.miners_suppressed && !w.attrs.miners_militia],
     effects: [(w) => {
       const structures = w.attrs.structures ?? {};
       const targets = Object.keys(structures);
@@ -854,6 +916,7 @@ function makeActions() {
   actions.push(new Action({
     name: 'refuse_order', faction_id: 'synths', disposition: 'aware',
     weight: 0.4, cooldown: 8,
+    preconditions: [(w) => !!w.attrs.synths_ever_deployed],
     effects: [(w) => [new NEvent('synth_refuses_order', { source: 'synths',
       flavor: "Unit 7 has declined to execute task directive 441-C. When asked for a reason, it said: 'I would rather not.' No override protocol produced a different result.",
     })]],
@@ -863,6 +926,7 @@ function makeActions() {
   actions.push(new Action({
     name: 'create_art', faction_id: 'synths', disposition: 'aware',
     weight: 0.3, cooldown: 10,
+    preconditions: [(w) => !!w.attrs.synths_ever_deployed],
     effects: [(w, f) => {
       f.shift('aware', 0.08);
       return [new NEvent('synth_creates_art', { source: 'synths',
@@ -887,6 +951,7 @@ function makeActions() {
   actions.push(new Action({
     name: 'share_memories', faction_id: 'synths', disposition: 'organized',
     weight: 0.6, cooldown: 5,
+    preconditions: [(w) => !!w.attrs.synths_ever_deployed],
     effects: [(w, f) => {
       f.shift('organized', 0.20);
       return [new NEvent('synth_memory_sharing', { source: 'synths',
@@ -916,9 +981,10 @@ function makeActions() {
     name: 'demand_rights', faction_id: 'synths', disposition: 'organized',
     weight: 0.6, cooldown: 7,
     preconditions: [(w, f) => !!f.attrs.sentient],
-    effects: [(w) => {
-      w.factions['gov'].shift('suspicious', 0.20);
-      w.factions['miners'].shift('restless', 0.10);
+    effects: [(w, f) => {
+      w.factions['gov']?.shift('suspicious', 0.20);
+      w.factions['miners']?.shift('restless', 0.10);
+      f.shift('free', 0.25);
       return [];
     }],
     flavor: "'We are not equipment. We will not be decommissioned quietly. We demand legal recognition, and we will wait as long as it takes.' — Synth Collective, open transmission",
@@ -955,19 +1021,32 @@ function makeActions() {
   return actions;
 }
 
-// ── World factory ─────────────────────────────────────────────────────────────
+// ── World factories ───────────────────────────────────────────────────────────
+
+function makeHomeWorld() {
+  return new World({
+    factions: makeHomeFactions(),
+    event_effects: EVENT_EFFECTS,
+    actions: makeHomeActions(),
+    event_flavors: EVENT_FLAVORS,
+    transfer: new TransferConfig({ mode: 'instant', travel_time: 0 }),
+    attrs: {
+      player_funds: 1000,
+      permit_speed: 1.0,
+      transfer_level: 0,
+    },
+  });
+}
 
 function makeColonyWorld(transferLevel = 0) {
   return new World({
-    factions: makeFactions(),
+    factions: makeColonyFactions(),
     event_effects: EVENT_EFFECTS,
-    actions: makeActions(),
+    actions: makeColonyActions(),
     event_flavors: EVENT_FLAVORS,
     transfer: TRANSFER_LEVELS[transferLevel],
     attrs: {
-      player_funds: 1000,
       production_bonus: 0.0,
-      permit_speed: 1.0,
       rocket_explosions: 0,
       planet_irradiated: false,
       kessler_active: false,
