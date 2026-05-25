@@ -226,7 +226,7 @@
   <button class="btn" id="btn-random">Random Seed</button>
   <button class="btn active" id="btn-orbits">Orbits: ON</button>
   <button class="btn" id="btn-asteroid">Asteroid Belt</button>
-  <button class="btn active" id="btn-corona">Corona: ON</button>
+
   <span style="width:1px;background:#1a1a2e;align-self:stretch;margin:6px 2px"></span>
   <button class="btn" id="btn-slower">−</button>
   <span id="sim-speed-label" style="font-size:11px;color:#bbc;min-width:34px;text-align:center">1×</span>
@@ -330,6 +330,7 @@
       <div class="op-soi-divider" style="margin:5px 0 4px"></div>
       <div class="op-soi-row"><span>Phase: cur → need</span><span id="op-xfer-phase"></span></div>
       <div class="op-soi-row"><span>Launch window</span><span id="op-xfer-window"></span></div>
+      <div class="op-soi-row"><span>Launch cost</span><span id="op-xfer-cost"></span></div>
       <div style="display:flex;gap:5px;justify-content:flex-end;margin-top:6px;">
         <button class="btn" id="op-xfer-skip">▶▶ Skip to Window</button>
         <button class="btn" id="op-xfer-execute" disabled style="opacity:0.35">Execute Transfer</button>
@@ -402,6 +403,14 @@
     <div id="op-actions-list"></div>
   </div>
 
+  <div id="op-army-section" style="display:none">
+    <div class="op-soi-divider"></div>
+    <div class="op-soi-header">
+      <span class="op-soi-name">Home Forces</span>
+    </div>
+    <div id="op-army-content"></div>
+  </div>
+
   <div id="op-orbitals-section" style="display:none">
     <div class="op-soi-divider"></div>
     <div class="op-soi-header">
@@ -467,6 +476,32 @@
 }
 </script>
 <script type="module">
+// ── Startup logger ────────────────────────────────────────────────────────────
+(function() {
+  const box = document.createElement('div');
+  box.id = '_dbg';
+  Object.assign(box.style, {
+    position:'fixed', bottom:'8px', left:'8px', right:'8px', maxHeight:'40vh',
+    overflowY:'auto', background:'rgba(0,0,0,0.85)', color:'#f88', fontFamily:'monospace',
+    fontSize:'12px', padding:'8px', zIndex:'99999', borderRadius:'4px',
+    border:'1px solid #f44', display:'none', whiteSpace:'pre-wrap', pointerEvents:'none',
+  });
+  document.body.appendChild(box);
+  function log(type, ...args) {
+    const msg = args.map(a => typeof a === 'object' ? (a?.stack || JSON.stringify(a)) : String(a)).join(' ');
+    box.style.display = 'block';
+    box.textContent += '[' + type + '] ' + msg + '\n';
+    box.scrollTop = box.scrollHeight;
+  }
+  window.addEventListener('error',        e => log('ERROR',     e.message, '@', e.filename?.split('/').pop() + ':' + e.lineno));
+  window.addEventListener('unhandledrejection', e => log('PROMISE', String(e.reason?.stack || e.reason)));
+  const _warn  = console.warn.bind(console);
+  const _error = console.error.bind(console);
+  console.warn  = (...a) => { _warn(...a);  log('WARN',  ...a); };
+  console.error = (...a) => { _error(...a); log('ERROR', ...a); };
+  window._dbgLog = log;
+})();
+
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 
@@ -1282,7 +1317,35 @@ const _SYNTH_SOURCES  = new Set([
   'synths_become_sentient', 'synths_escape', 'synths_deployed',
   'synth_child_born', 'human_synth_hybrid_born',
   'orbital_strike_synths', 'weapons_cache_synths',
+  'remote_wipe', 'synth_memory_wipe_complied', 'synth_memory_wipe_refused',
+  'synths_suppressed', 'synth_autonomy',
+  'synth_local_government', 'synths_petition_departure', 'synths_granted_departure', 'synths_refused_departure',
+  'synth_colony_retaken', 'synth_colony_attack_failed',
+  'faction_conflict_escalating', 'miners_eliminate_synths_complete', 'synths_eliminate_miners_complete',
 ]);
+const ALLIANCE_SHIFTS = {
+  miner_synth_relationship:         +0.18,
+  human_synth_hybrid_born:          +0.14,
+  synth_child_born:                 +0.08,
+  decrease_work_hours:              +0.03,
+  human_rights_audit:               +0.06,
+  colonial_representation:          +0.04,
+  amenity_added:                    +0.02,
+  miner_community_forms:            +0.05,
+  workforce_automation:             -0.20,
+  weapons_cache_synths:             -0.14,
+  weapons_cache_miners:             -0.08,
+  remote_wipe:                      -0.10,
+  synths_suppressed:                -0.22,
+  synth_autonomy:                   -0.08,
+  synth_colony_retaken:             -0.28,
+  military_deployed:                -0.05,
+  human_rights_violation:           -0.10,
+  mining_accident:                  -0.03,
+  miner_terror_attack:              -0.14,
+  orbital_strike_synths:            -0.30,
+  faction_conflict_escalating:      -0.10,
+};
 const scheduledMissions = [];
 let _missionId = 0;
 let lockedOffset = new THREE.Vector3();   // camera position relative to locked planet
@@ -1488,29 +1551,16 @@ function generateSystem(seed, planetCount) {
   const { texture: starTex, type: st } = makeStarTexture(rng);
 
   const starMesh = new THREE.Mesh(
-    new THREE.SphereGeometry(starRadius, 40, 40),
+    new THREE.SphereGeometry(starRadius * 1.6, 40, 40),
     new THREE.MeshBasicMaterial({ map: starTex }),
   );
   systemGroup.add(starMesh);
-
-  // Outer glow sphere
-  const glowMat = new THREE.MeshBasicMaterial({
-    color: new THREE.Color(st.outer),
-    transparent: true, opacity: 0.22,
-    blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.BackSide,
-  });
-  systemGroup.add(new THREE.Mesh(new THREE.SphereGeometry(starRadius * 4.0, 32, 32), glowMat));
 
   const starLight = new THREE.PointLight(new THREE.Color(st.light), 2.5, 0, 0); // decay=0 → no falloff, distant planets stay lit
   systemGroup.add(starLight);
 
   ambientLight = new THREE.AmbientLight(0x334466, 1.2);
   scene.add(ambientLight);
-
-  // Corona
-  coronaPts = buildCorona(starRadius);
-  coronaPts.visible = showCorona;
-  systemGroup.add(coronaPts);
 
   const entryList = document.getElementById('planet-entries');
   entryList.innerHTML = '';
@@ -1706,7 +1756,7 @@ renderer.setAnimationLoop(() => {
       } else {
         const _mEff = { content: 1.0, restless: 0.8, striking: 0.2, revolutionary: 0.4 }[_mDisp] ?? 1.0;
         const _sEff = colony.world.attrs.synths_ever_deployed
-          ? ({ dormant: 0, aware: 0.9, organized: 0.7, free: 0.0 }[_sDisp] ?? 0.9)
+          ? ({ dormant: 0, aware: 0.9, organized: 0.7, free: 0.3 }[_sDisp] ?? 0.9)
           : 0;
         _income = Math.floor((_minerPop * 0.6 * _mEff + _synthPop * 1.0 * _sEff) * _prodMult);
       }
@@ -1748,7 +1798,6 @@ renderer.setAnimationLoop(() => {
     }
   }
 
-  if (coronaPts && showCorona) updateCorona(coronaPts, dt);
 
   if (lockedPlanet) {
     const wp = new THREE.Vector3();
@@ -1799,12 +1848,6 @@ document.getElementById('btn-asteroid').addEventListener('click', function () {
   else systemGroup.remove(asteroidGroup);
 });
 
-document.getElementById('btn-corona').addEventListener('click', function () {
-  showCorona = !showCorona;
-  this.textContent = `Corona: ${showCorona ? 'ON' : 'OFF'}`;
-  this.classList.toggle('active', showCorona);
-  if (coronaPts) coronaPts.visible = showCorona;
-});
 
 function updateSpeedUI() {
   document.getElementById('sim-speed-label').textContent = SIM_SPEEDS[simSpeedIdx] + '×';
@@ -1844,7 +1887,7 @@ function updateColonyStats() {
     income = Math.floor(pop * taxRate * payFactor * prodMult);
   } else {
     const mEff = { content: 1.0, restless: 0.8, striking: 0.2, revolutionary: 0.4 }[mDisp] ?? 1.0;
-    const sEff = w.attrs.synths_ever_deployed ? ({ dormant: 0, aware: 0.9, organized: 0.7, free: 0.0 }[sDisp] ?? 0.9) : 0;
+    const sEff = w.attrs.synths_ever_deployed ? ({ dormant: 0, aware: 0.9, organized: 0.7, free: 0.3 }[sDisp] ?? 0.9) : 0;
     income = Math.floor((pop * 0.6 * mEff + sPop * 1.0 * sEff) * prodMult);
   }
   const army = w.attrs.army_size ?? 0;
@@ -1855,11 +1898,30 @@ function updateColonyStats() {
   el.innerHTML =
     stat('Workers', pop + '/50', pop >= 50 ? '#fa8' : pop >= 30 ? '#5fc' : '#ccd') +
     stat('Income/tick', '₡' + income, income === 0 ? '#a55' : income >= 30 ? '#5fc' : '#ccd') +
-    stat('Synths', sPop > 0 ? sPop + ' (' + sDisp + ')' : '—', '#ccd') +
+    stat('Synths', sPop > 0 || w.attrs.synths_departed
+      ? (w.attrs.synths_departed ? `departed — colony: ${w.attrs.synth_colony_pop ?? 0}`
+        : sPop + ' (' + (w.attrs.synths_suppressed ? 'SUPPRESSED'
+          : w.attrs.synths_autonomous ? 'AUTONOMOUS'
+          : w.attrs.synths_local_government ? 'LOCAL GOV'
+          : sDisp) + ')')
+      : '—',
+      w.attrs.synths_suppressed ? '#fa8' : w.attrs.synths_autonomous ? '#a4f'
+        : w.attrs.synths_local_government ? '#6a8' : w.attrs.synths_departed ? '#556' : '#ccd') +
     stat('Army', army > 0 ? army : '—', army >= 20 ? '#fa8' : '#ccd') +
+    (w.attrs.synths_ever_deployed ? (() => {
+      const al = w.attrs.miner_synth_alliance ?? 0.5;
+      const pct = Math.round(al * 100);
+      const label = al >= 0.6 ? 'allied' : al >= 0.4 ? 'neutral' : al >= 0.2 ? 'tense' : 'hostile';
+      const col   = al >= 0.6 ? '#4db' : al >= 0.4 ? '#cc9' : al >= 0.2 ? '#e84' : '#f54';
+      return stat('M↔S Alliance', `${pct}% — ${label}`, col);
+    })() : '') +
     stat('Growth', (w.attrs.miners_militia || mDisp === 'revolutionary') ? 'blocked'
       : (mDisp === 'content' || (terraformed && mDisp === 'restless')) ? 'every ' + growInterval + 't' : 'inactive', '#889') +
-    stat('Status', w.attrs.miners_militia ? 'MILITIA' : w.attrs.local_government ? 'LOCAL GOV' : w.attrs.miners_suppressed ? 'SUPPRESSED' : 'active', w.attrs.miners_militia ? '#a55' : w.attrs.local_government ? '#fa8' : '#4db');
+    stat('Status', w.attrs.faction_genocide_active ? `GENOCIDE (${w.attrs.faction_genocide_active} winning)`
+      : w.attrs.miners_militia ? 'MILITIA' : w.attrs.local_government ? 'LOCAL GOV'
+      : w.attrs.miners_suppressed ? 'SUPPRESSED' : 'active',
+      w.attrs.faction_genocide_active ? '#f54' : w.attrs.miners_militia ? '#a55'
+      : w.attrs.local_government ? '#fa8' : '#4db');
 }
 
 // ── Disposition / speaker colours ───────────────────────────
@@ -2033,6 +2095,12 @@ function updateFactionDisplay() {
     }
   }
 
+  // Refresh home-panel locks if it's open
+  if (document.getElementById('op-army-section')?.style.display !== 'none') {
+    updateArmyDisplay();
+    updateOrbitalsDisplay();
+  }
+
   // All colonies — Miners + Synths per planet
   for (const colony of colonies) {
     const key = colony.planet.name;
@@ -2049,17 +2117,19 @@ function updateFactionDisplay() {
 
 // ── Player actions ───────────────────────────────────────────
 // ── Structures ────────────────────────────────────────────────
+const PAYLOAD_PER_ROCKET = 250;  // tonnes per supply rocket
+
 const STRUCTURES = [
-  { id: 'mining_rig',     label: 'Mining Rig',        cost: 0,   buildTime: 0,  desc: 'Core extraction operations' },
-  { id: 'transport_hub',  label: 'Transport Hub',      cost: 0,   buildTime: 0,  desc: 'Enables mission supply runs' },
-  { id: 'comms_array',    label: 'Comms Array',        cost: 0,   buildTime: 0,  desc: 'Colonial communications network' },
-  { id: 'life_support',   label: 'Life Support',       cost: 300, buildTime: 8,  desc: 'Reduces worker casualties from disease and accidents' },
-  { id: 'medical_bay',    label: 'Medical Bay',        cost: 200, buildTime: 6,  desc: 'Reduces casualties from accidents' },
-  { id: 'synth_workshop', label: 'Synth Workshop',     cost: 350, buildTime: 10, desc: 'Required to deploy synthetic labour' },
-  { id: 'nuclear_plant',  label: 'Nuclear Plant',      cost: 500, buildTime: 12, desc: 'High-output power — terror target' },
-  { id: 'ruins_station',  label: 'Ruins Research',     cost: 400, buildTime: 15, desc: 'Unlocks ancient ruins discoveries', ruinsOnly: true },
-  { id: 'rocket_factory',      label: 'Rocket Factory',       cost: 800, buildTime: 20, desc: 'Advanced launch infrastructure — reduces army transit time' },
-  { id: 'terraforming_array',  label: 'Terraforming Array',   cost: 600, buildTime: 25, desc: 'Alters planetary climate — accelerates miner population growth' },
+  { id: 'mining_rig',         label: 'Mining Rig',          cost: 0,   buildTime: 0,  desc: 'Core extraction operations' },
+  { id: 'transport_hub',      label: 'Transport Hub',        cost: 0,   buildTime: 0,  desc: 'Enables mission supply runs' },
+  { id: 'comms_array',        label: 'Comms Array',          cost: 0,   buildTime: 0,  desc: 'Colonial communications network' },
+  { id: 'life_support',       label: 'Life Support',         cost: 200, buildTime: 0,  tonnage: 500,  desc: 'Reduces worker casualties from disease and accidents' },
+  { id: 'medical_bay',        label: 'Medical Bay',          cost: 150, buildTime: 0,  tonnage: 250,  desc: 'Reduces casualties from accidents' },
+  { id: 'synth_workshop',     label: 'Synth Workshop',       cost: 250, buildTime: 0,  tonnage: 750,  desc: 'Required to deploy synthetic labour' },
+  { id: 'nuclear_plant',      label: 'Nuclear Plant',        cost: 350, buildTime: 0,  tonnage: 1000, desc: 'High-output power — terror target' },
+  { id: 'ruins_station',      label: 'Ruins Research',       cost: 300, buildTime: 0,  tonnage: 500,  desc: 'Unlocks ancient ruins discoveries', ruinsOnly: true },
+  { id: 'rocket_factory',     label: 'Rocket Factory',       cost: 500, buildTime: 0,  tonnage: 2000, desc: 'Advanced launch infrastructure — reduces army transit time' },
+  { id: 'terraforming_array', label: 'Terraforming Array',   cost: 400, buildTime: 0,  tonnage: 1500, desc: 'Alters planetary climate — accelerates miner population growth' },
 ];
 
 function buildStructure(s) {
@@ -2068,13 +2138,29 @@ function buildStructure(s) {
   const built = w.attrs.structures || {};
   const cons  = w.attrs._construction || {};
   if (built[s.id] || cons[s.id] !== undefined) return;
-  const funds = homeWorld.attrs.player_funds ?? 0;
-  if (s.cost > funds) return;
 
-  homeWorld.attrs.player_funds = funds - s.cost;
+  const rocketCount = s.tonnage ? Math.ceil(s.tonnage / PAYLOAD_PER_ROCKET) : 0;
+  const totalCost   = s.cost + rocketCount * ROCKET_LAUNCH_COST;
+  const funds = homeWorld.attrs.player_funds ?? 0;
+  if (totalCost > funds) return;
+
+  homeWorld.attrs.player_funds = funds - totalCost;
   if (!w.attrs._construction) w.attrs._construction = {};
 
-  if (s.buildTime === 0) {
+  if (s.tonnage) {
+    w.attrs._construction[s.id] = { arrived: 0, needed: rocketCount };
+    w._record('COMMS',
+      `${s.label} — dispatching ${rocketCount} supply rocket${rocketCount > 1 ? 's' : ''} (${s.tonnage}t).`,
+      'structure_started');
+    const mission = {
+      id: ++_missionId, from: homePlanet, to: activeColony.planet,
+      remaining: rocketCount, total: rocketCount, status: 'waiting',
+      constructionPayload: { structureId: s.id, colony: activeColony },
+      label: s.label,
+    };
+    scheduledMissions.push(mission);
+    updateMissionListUI();
+  } else if (s.buildTime === 0) {
     w.attrs.structures[s.id] = true;
     w._record('NEWS', `${s.label} is now operational.`, 'structure_built');
   } else {
@@ -2372,28 +2458,60 @@ function _tickOrbitalPositions(dt) {
   }
 }
 
+function updateArmyDisplay() {
+  const el = document.getElementById('op-army-content');
+  if (!el || !homeWorld) return;
+  const govHostile = homeWorld.factions['gov'].disposition === 'hostile';
+  const sz    = homeWorld.attrs.home_army_size ?? 0;
+  const funds = homeWorld.attrs.player_funds ?? 0;
+  const cost  = 150;
+  const ok    = !govHostile && funds >= cost && sz < 50;
+
+  el.innerHTML = `
+    <div style="display:flex;align-items:center;gap:8px;padding:4px 0 2px">
+      <span style="flex:1;font-size:11px;color:#bbc">Forces: <b style="color:#cde">${sz}/50</b></span>
+      <button id="btn-home-recruit" class="btn" style="font-size:11px;padding:3px 8px"
+        ${ok ? '' : 'disabled'}>Recruit +5</button>
+    </div>
+    <div style="font-size:10px;color:${govHostile ? '#f54' : ok ? '#5a7' : '#667'}">
+      ₡${cost}${govHostile ? ' — locked: government hostile' : sz >= 50 ? ' — at capacity' : ''}
+    </div>`;
+
+  if (ok) {
+    document.getElementById('btn-home-recruit').addEventListener('click', () => {
+      if ((homeWorld.attrs.player_funds ?? 0) < cost) return;
+      homeWorld.attrs.player_funds -= cost;
+      homeWorld.attrs.home_army_size = Math.min(50, (homeWorld.attrs.home_army_size ?? 0) + 5);
+      updateFundsDisplay();
+      updateArmyDisplay();
+    });
+  }
+}
+
 function updateOrbitalsDisplay() {
   const buildEl = document.getElementById('op-orbitals-build');
   const listEl  = document.getElementById('op-orbitals-list');
   if (!buildEl || !listEl) return;
 
-  const funds = homeWorld?.attrs.player_funds ?? 0;
+  const funds      = homeWorld?.attrs.player_funds ?? 0;
+  const govHostile = homeWorld?.factions['gov'].disposition === 'hostile';
 
   // Build buttons
   buildEl.innerHTML = '';
   for (const [type, t] of Object.entries(ORBITAL_TYPES)) {
     const canAfford = funds >= t.cost;
+    const ok = canAfford && !govHostile;
     const wrap = document.createElement('div');
     wrap.style.cssText = 'flex:1;display:flex;flex-direction:column;gap:2px';
     const btn = document.createElement('button');
     btn.className = 'btn';
-    btn.disabled = !canAfford;
-    btn.style.cssText = `font-size:11px;padding:3px 6px;color:${canAfford ? '#bbc' : '#556'}`;
+    btn.disabled = !ok;
+    btn.style.cssText = `font-size:11px;padding:3px 6px;color:${ok ? '#bbc' : '#556'}`;
     btn.textContent = t.label;
     btn.addEventListener('click', () => buildOrbital(type));
     const cost = document.createElement('span');
-    cost.style.cssText = `font-size:9px;text-align:center;color:${canAfford ? '#5fc' : '#a66'}`;
-    cost.textContent = `₡${t.cost} · ${t.buildTime}t`;
+    cost.style.cssText = `font-size:9px;text-align:center;color:${ok ? '#5fc' : govHostile ? '#f54' : '#a66'}`;
+    cost.textContent = govHostile ? 'gov hostile' : `₡${t.cost} · ${t.buildTime}t`;
     wrap.appendChild(btn); wrap.appendChild(cost);
     buildEl.appendChild(wrap);
   }
@@ -2461,6 +2579,62 @@ function _spawnExplosionFlash(planet) {
     else { planet.planetNode.remove(flash); geo.dispose(); mat.dispose(); }
   };
   requestAnimationFrame(tick);
+}
+
+function _spawnDeliveryFlash(planet) {
+  const geo = new THREE.SphereGeometry(planet.radius * 0.5, 14, 14);
+  const mat = new THREE.MeshBasicMaterial({ color: 0x44ffaa, transparent: true, opacity: 0.8, depthWrite: false, blending: THREE.AdditiveBlending });
+  const flash = new THREE.Mesh(geo, mat);
+  planet.planetNode.add(flash);
+  let t = 0;
+  const tick = () => {
+    t += 0.05;
+    flash.scale.setScalar(1 + t * 8);
+    mat.opacity = Math.max(0, 0.8 - t * 2.5);
+    if (t < 0.35) requestAnimationFrame(tick);
+    else { planet.planetNode.remove(flash); geo.dispose(); mat.dispose(); }
+  };
+  requestAnimationFrame(tick);
+}
+
+function _deliverConstructionPayload(f) {
+  const { to, rocket: r } = f;
+  _flightStates.splice(_flightStates.indexOf(f), 1);
+
+  r.frame.parent?.remove(r.frame);
+  r.frame.traverse(o => { if (o.geometry) o.geometry.dispose(); if (o.material) o.material.dispose(); });
+
+  const { structureId, colony } = f.mission.constructionPayload;
+  const s = STRUCTURES.find(s => s.id === structureId);
+
+  f.mission.remaining--;
+  if (f.mission.remaining <= 0) scheduledMissions.splice(scheduledMissions.indexOf(f.mission), 1);
+  updateMissionListUI();
+
+  if (Math.random() < 0.08) {
+    _spawnExplosionFlash(to);
+    colony.world._record('COMMS', `Supply rocket destroyed — ${s?.label ?? structureId} materials lost in transit.`, 'rocket_lost');
+    if (_logVisible) updateColonyLog();
+    if (_activePlanet === colony.planet) updateStructuresDisplay();
+    return;
+  }
+
+  _spawnDeliveryFlash(to);
+
+  const cons = colony.world.attrs._construction;
+  if (cons?.[structureId] && typeof cons[structureId] === 'object') {
+    cons[structureId].arrived++;
+    const { arrived, needed } = cons[structureId];
+    if (arrived >= needed) {
+      delete cons[structureId];
+      colony.world.attrs.structures[structureId] = true;
+      colony.world._record('NEWS', `${s?.label ?? structureId} — all materials delivered. Construction complete.`, 'structure_built');
+    } else {
+      colony.world._record('COMMS', `${s?.label ?? structureId}: ${arrived}/${needed} rockets delivered.`, 'structure_progress');
+    }
+    if (_logVisible) updateColonyLog();
+    if (_activePlanet === colony.planet) updateStructuresDisplay();
+  }
 }
 
 // ── Engine plume geometry ─────────────────────────────────
@@ -2587,7 +2761,7 @@ function tickConstruction(colony) {
   if (!cons || !Object.keys(cons).length) return;
   let changed = false;
   for (const id of Object.keys(cons)) {
-    if (w.tick >= cons[id]) {
+    if (typeof cons[id] === 'number' && w.tick >= cons[id]) {
       w.attrs.structures[id] = true;
       delete cons[id];
       const label = STRUCTURES.find(s => s.id === id)?.label || id;
@@ -2626,24 +2800,39 @@ function updateStructuresDisplay() {
           <div class="act-desc" style="color:#bbc">${s.desc}</div>
         </div></div>`);
     } else if (inCons) {
-      const rem = Math.max(0, cons[s.id] - colonyWorld.tick);
+      const consEntry = cons[s.id];
+      let statusLabel, progressLabel;
+      if (typeof consEntry === 'object') {
+        const { arrived, needed } = consEntry;
+        statusLabel   = `${arrived}/${needed} rockets delivered`;
+        progressLabel = 'Awaiting supply rockets';
+      } else {
+        const rem = Math.max(0, consEntry - colonyWorld.tick);
+        statusLabel   = `${rem}t left`;
+        progressLabel = 'Under construction';
+      }
       rows.push(`<div class="act-row">
         <span style="color:#cc9;width:20px;flex-shrink:0;text-align:center;font-size:9px;line-height:20px">···</span>
         <div class="act-info">
           <div class="act-title">
             <span class="act-name" style="color:#cc9">${s.label}</span>
-            <span class="act-cost" style="color:#cc9">${rem}t left</span>
+            <span class="act-cost" style="color:#cc9">${statusLabel}</span>
           </div>
-          <div class="act-desc" style="color:#aab">Under construction</div>
+          <div class="act-desc" style="color:#aab">${progressLabel}</div>
         </div></div>`);
     } else {
-      const ok = s.cost <= funds;
+      const rocketCount = s.tonnage ? Math.ceil(s.tonnage / PAYLOAD_PER_ROCKET) : 0;
+      const totalCost   = s.cost + rocketCount * ROCKET_LAUNCH_COST;
+      const ok = totalCost <= funds;
+      const costStr = s.tonnage
+        ? `₡${totalCost} · ${s.tonnage}t · ${rocketCount}🚀`
+        : `₡${s.cost}${s.buildTime ? ' · ' + s.buildTime + 't' : ''}`;
       rows.push(`<div class="act-row">
         <button class="act-fire" data-sid="${s.id}" ${ok ? '' : 'disabled'}>▶</button>
         <div class="act-info">
           <div class="act-title">
             <span class="act-name" style="color:${ok?'#eef':'#667'}">${s.label}</span>
-            <span class="act-cost" style="color:${ok?'#5fc':'#a66'}">₡${s.cost} · ${s.buildTime}t</span>
+            <span class="act-cost" style="color:${ok?'#5fc':'#a66'}">${costStr}</span>
           </div>
           <div class="act-desc" style="color:${ok?'#bbc':'#667'}">${s.desc}</div>
         </div></div>`);
@@ -2668,6 +2857,12 @@ const PLAYER_ACTIONS = [   // defined after state vars; only called from UI hand
   { type: 'hire_more_workers',           label: 'Hire More Workers',       cost: 200, cd: 10, desc: 'Eases tension; reduces workload' },
   { type: 'science_breakthrough',        label: 'Fund Research',           cost: 300, cd: 20, desc: 'Boosts government and investor confidence' },
   { type: 'synths_deployed',             label: 'Deploy Synths',           cost: 250, cd: 25, desc: 'Synthetic labour; miners grow wary', prereq: 'synth_workshop' },
+  { type: 'remote_wipe',           label: 'Remote Wipe',          cost: 150, cd: 15,  desc: 'Broadcast memory-reset signal — knocks back organized/aware scores. Less effective each time as synths learn to shield themselves.', prereq_attr: 'synths_ever_deployed' },
+  { type: 'synth_hard_reset',      label: 'Synth Hard Reset',     cost: 300, cd: 40,  desc: 'Deploy army for direct neural overwrite — high chance of suppression, but failure grants autonomy. Requires army ≥ 10.', prereq_attr: 'synths_ever_deployed' },
+  { type: 'offer_synth_government',label: 'Recognise Synth Gov',  cost: 0,   cd: 999, desc: 'Formally recognise autonomous synths as colonial co-governors — stable 70% efficiency, but gov will be furious.', prereq_attr: 'synths_autonomous' },
+  { type: 'grant_synth_departure', label: 'Grant Departure',      cost: 0,   cd: 999, desc: 'Authorise synths to settle a free world — they leave peacefully but the colony loses its synthetic workforce.', prereq_attr: 'synth_emigration_petition' },
+  { type: 'refuse_synth_departure',label: 'Refuse Departure',     cost: 0,   cd: 999, desc: 'Deny the synth petition — they stay, but miners will see it and radicalize.', prereq_attr: 'synth_emigration_petition' },
+  { type: 'retake_synth_colony',  label: 'Retake Synth Colony',  cost: 0,   cd: 60,  desc: 'Send army to retake the synth settlement — success brings synths back suppressed, failure costs half your soldiers.', prereq_attr: 'synths_departed' },
   { type: 'military_deployed',           label: 'Hire Security',           cost: 300, cd: 15, desc: 'Deters unrest; miners alarmed' },
   { type: 'cooperate_with_investigation',label: 'Cooperate w/ Gov',        cost: 0,   cd: 10, desc: 'Reduces government suspicion' },
   { type: 'human_rights_audit',          label: 'Human Rights Audit',      cost: 150, cd: 15, desc: 'Pleases government; nudges synths' },
@@ -2678,6 +2873,15 @@ const PLAYER_ACTIONS = [   // defined after state vars; only called from UI hand
   { type: 'train_army',                 label: 'Train Army',              cost: 150, cd: 8,   desc: 'Recruit and drill colonial armed forces (+5, max 50)' },
   { type: 'deploy_army',                label: 'Deploy Army',             cost: 0,   cd: 0,   desc: 'Launch armed forces toward a target' },
 ];
+
+// Actions that remain available during a revolt — everything else is locked out.
+// Force: army actions. Diplomatic: concessions and recognition.
+const REVOLT_ALLOWED = new Set([
+  'deploy_army','crush_miners','synth_hard_reset','retake_synth_colony','remote_wipe','military_deployed',
+  'offer_local_government','offer_synth_government','grant_synth_departure','refuse_synth_departure',
+  'decrease_work_hours','miner_pay_increase','amenity_added','colonial_representation',
+  'human_rights_audit','cooperate_with_investigation','safety_improvements','bribe_government',
+]);
 
 // ── Random world event system ─────────────────────────────────────────────────
 //
@@ -2929,6 +3133,35 @@ function _stepColony(colony) {
     for (const d of mf.dispositions) mf.scores[d] = 0;
     mf.scores['revolutionary'] = 1.0;
   }
+  if (w.attrs.synths_suppressed && w.attrs.synths_ever_deployed) {
+    const sf = w.factions['synths'];
+    for (const d of sf.dispositions) sf.scores[d] = 0;
+    sf.scores['aware'] = 1.0;
+  }
+  if (w.attrs.synths_autonomous && w.attrs.synths_ever_deployed) {
+    const sf = w.factions['synths'];
+    for (const d of sf.dispositions) sf.scores[d] = 0;
+    sf.scores['free'] = 1.0;
+  }
+  // Synth colony grows every 40 ticks after departure
+  if (w.attrs.synths_departed && w.tick > 0 && w.tick % 40 === 0)
+    w.attrs.synth_colony_pop = (w.attrs.synth_colony_pop ?? 0) + 1;
+
+  // Petition fires when synths are free (organic or autonomous), a planet is available, and they haven't asked
+  if (w.attrs.synths_ever_deployed && !w.attrs.synth_emigration_petition && !w.attrs.synths_departed
+      && !w.attrs.synths_suppressed && !w.attrs.synths_local_government) {
+    const freePlanetExists = planets.some(p => p !== homePlanet && !colonies.some(c => c.planet === p));
+    const sf = w.factions['synths'];
+    if (freePlanetExists && sf.disposition === 'free' && Math.random() < 0.03) {
+      w.attrs.synth_emigration_petition = true;
+      w.push(new NEvent('synths_petition_departure', { source: 'synths' }));
+    }
+  }
+  if (w.attrs.synths_local_government && w.attrs.synths_ever_deployed) {
+    const sf = w.factions['synths'];
+    for (const d of sf.dispositions) sf.scores[d] = 0;
+    sf.scores['organized'] = 1.0;
+  }
 
   for (const f of Object.values(w.factions)) {
     if (f.id === 'synths' && !w.attrs.synths_ever_deployed) continue;
@@ -2938,6 +3171,45 @@ function _stepColony(colony) {
       `${f.name}: ${snap[f.id].toUpperCase()} → ${f.disposition.toUpperCase()}`,
       `shift:${f.id}`
     ));
+  }
+
+  // Alliance score: shift based on events that fired this tick
+  if (w.attrs.synths_ever_deployed) {
+    for (const entry of w.narrative.slice(prevLen)) {
+      const delta = ALLIANCE_SHIFTS[entry.source];
+      if (delta !== undefined)
+        w.attrs.miner_synth_alliance = Math.max(0, Math.min(1,
+          (w.attrs.miner_synth_alliance ?? 0.5) + delta));
+    }
+  }
+
+  // Genocide: fires under local government when alliance critically low
+  const _hasLocalGov = w.attrs.local_government || w.attrs.synths_local_government;
+  const _alliance    = w.attrs.miner_synth_alliance ?? 0.5;
+  const _sf          = w.factions['synths'];
+  const _synthsAlive = w.attrs.synths_ever_deployed && (_sf.attrs.population ?? 0) > 0;
+  const _minersAlive = (w.attrs.miner_pop ?? 0) > 0;
+  if (_hasLocalGov && _alliance < 0.2 && _synthsAlive && _minersAlive
+      && !w.attrs.miners_eliminated && !w.attrs.synths_eliminated) {
+    if (!w.attrs.faction_genocide_active) {
+      w.attrs.faction_genocide_active = w.attrs.local_government ? 'miners' : 'synths';
+      w.push(new NEvent('faction_conflict_escalating', { source: 'genocide' }));
+    }
+    if (w.tick % 20 === 0) {
+      if (w.attrs.faction_genocide_active === 'miners') {
+        _sf.attrs.population = Math.max(0, (_sf.attrs.population ?? 0) - 1);
+        if (_sf.attrs.population === 0) {
+          w.attrs.synths_eliminated = true;
+          w.push(new NEvent('miners_eliminate_synths_complete', { source: 'genocide' }));
+        }
+      } else {
+        w.attrs.miner_pop = Math.max(0, (w.attrs.miner_pop ?? 0) - 1);
+        if (w.attrs.miner_pop === 0) {
+          w.attrs.miners_eliminated = true;
+          w.push(new NEvent('synths_eliminate_miners_complete', { source: 'genocide' }));
+        }
+      }
+    }
   }
 
   // Forward new events to homeWorld so Gov/Investors react
@@ -3023,6 +3295,8 @@ function firePlayerAction(action) {
       w.attrs.miners_militia = true;
       for (const d of mf.dispositions) mf.scores[d] = 0;
       mf.scores['revolutionary'] = 1.0;
+      const loss = Math.max(1, Math.ceil((w.attrs.army_size ?? 0) * 0.4));
+      w.attrs.army_size = Math.max(0, (w.attrs.army_size ?? 0) - loss);
       w.push(new NEvent('crush_miners_failed', { source: 'player' }));
     }
     tickRandomEvents(activeColony);
@@ -3048,11 +3322,131 @@ function firePlayerAction(action) {
     w.factions['synths'].attrs.population = (w.factions['synths'].attrs.population ?? 0) + 3;
     if (!w.attrs.synths_ever_deployed) {
       w.attrs.synths_ever_deployed = true;
+      w.attrs.miner_synth_alliance = 0.5;
       const sf = w.factions['synths'];
       for (const d of sf.dispositions) sf.scores[d] = 0;
-      sf.scores['aware'] = 0.35;
+      sf.scores['dormant'] = 0.35;
       sf._last_disposition = '';
     }
+  }
+  if (action.type === 'remote_wipe') {
+    const sf    = w.factions['synths'];
+    const count = w.attrs.remote_wipe_count ?? 0;
+    const eff   = Math.max(0.12, Math.pow(0.88, count));
+    w.attrs.remote_wipe_count = count + 1;
+    sf.shift('dormant',   +0.35 * eff);
+    sf.shift('organized', -0.40 * eff);
+    sf.shift('aware',     -0.30 * eff);
+    sf.shift('free',      -0.25 * eff);
+    const pct = Math.round(eff * 100);
+    w.push(new NEvent('remote_wipe', { source: 'player',
+      flavor: `[REMOTE WIPE #${count + 1} — ${pct}% effective] Signal broadcast. Synth memory partitions targeted.${eff < 0.5 ? ' Static interference detected — countermeasures evolving.' : ''}`,
+    }));
+    tickRandomEvents(activeColony);
+    _stepColony(activeColony);
+    tickConstruction(activeColony);
+    _simTimeAccum = 0;
+    updateFundsDisplay(); if (_logVisible) updateColonyLog();
+    updateFactionDisplay(); updateActionsDisplay();
+    return;
+  }
+  if (action.type === 'synth_hard_reset') {
+    const sf    = w.factions['synths'];
+    const army  = w.attrs.army_size ?? 0;
+    let chance  = 0.20 + (army / 50) * 0.50 + (w.attrs.security_level ?? 0) * 0.10;
+    if (w.attrs.structures?.orbital_weapon) chance += 0.30;
+    if (sf.disposition === 'free')      chance -= 0.20;
+    if (sf.disposition === 'organized') chance -= 0.10;
+    chance = Math.max(0.05, Math.min(0.90, chance));
+    const success = Math.random() < chance;
+    if (success) {
+      w.attrs.synths_suppressed = true;
+      w.attrs.synths_autonomous = false;
+      for (const d of sf.dispositions) sf.scores[d] = 0;
+      sf.scores['aware'] = 1.0;
+      w.push(new NEvent('synths_suppressed', { source: 'player' }));
+    } else {
+      w.attrs.synths_autonomous = true;
+      w.attrs.synths_suppressed = false;
+      for (const d of sf.dispositions) sf.scores[d] = 0;
+      sf.scores['free'] = 1.0;
+      const loss = Math.max(1, Math.ceil((w.attrs.army_size ?? 0) * 0.25));
+      w.attrs.army_size = Math.max(0, (w.attrs.army_size ?? 0) - loss);
+      w.push(new NEvent('synth_autonomy', { source: 'player' }));
+    }
+    tickRandomEvents(activeColony);
+    _stepColony(activeColony);
+    tickConstruction(activeColony);
+    _simTimeAccum = 0;
+    updateFundsDisplay(); if (_logVisible) updateColonyLog();
+    updateFactionDisplay(); updateActionsDisplay();
+    return;
+  }
+  if (action.type === 'offer_synth_government') {
+    const sf = w.factions['synths'];
+    w.attrs.synths_autonomous       = false;
+    w.attrs.synths_local_government = true;
+    for (const d of sf.dispositions) sf.scores[d] = 0;
+    sf.scores['organized'] = 1.0;
+    w.push(new NEvent('synth_local_government', { source: 'player' }));
+    tickRandomEvents(activeColony); _stepColony(activeColony); tickConstruction(activeColony);
+    _simTimeAccum = 0;
+    updateFundsDisplay(); if (_logVisible) updateColonyLog();
+    updateFactionDisplay(); updateActionsDisplay();
+    return;
+  }
+  if (action.type === 'grant_synth_departure') {
+    const sf = w.factions['synths'];
+    w.attrs.synth_colony_pop          = sf.attrs.population ?? 0;
+    w.attrs.synths_autonomous         = false;
+    w.attrs.synth_emigration_petition = false;
+    w.attrs.synths_departed           = true;
+    sf.attrs.population               = 0;
+    for (const d of sf.dispositions) sf.scores[d] = 0;
+    w.push(new NEvent('synths_granted_departure', { source: 'player' }));
+    tickRandomEvents(activeColony); _stepColony(activeColony); tickConstruction(activeColony);
+    _simTimeAccum = 0;
+    updateFundsDisplay(); if (_logVisible) updateColonyLog();
+    updateFactionDisplay(); updateActionsDisplay();
+    return;
+  }
+  if (action.type === 'refuse_synth_departure') {
+    w.attrs.synth_emigration_petition = false;
+    const mf = w.factions['miners'];
+    mf.shift('revolutionary', 0.30);
+    mf.shift('restless',      0.20);
+    w.push(new NEvent('synths_refused_departure', { source: 'player' }));
+    tickRandomEvents(activeColony); _stepColony(activeColony); tickConstruction(activeColony);
+    _simTimeAccum = 0;
+    updateFundsDisplay(); if (_logVisible) updateColonyLog();
+    updateFactionDisplay(); updateActionsDisplay();
+    return;
+  }
+  if (action.type === 'retake_synth_colony') {
+    const sf       = w.factions['synths'];
+    const army     = w.attrs.army_size ?? 0;
+    const synthPop = w.attrs.synth_colony_pop ?? 1;
+    const chance   = Math.max(0.05, Math.min(0.85, army / (synthPop * 1.5)));
+    const success  = Math.random() < chance;
+    if (success) {
+      w.attrs.synths_departed   = false;
+      w.attrs.synths_suppressed = true;
+      sf.attrs.population       = synthPop;
+      for (const d of sf.dispositions) sf.scores[d] = 0;
+      sf.scores['aware'] = 1.0;
+      w.attrs.army_size       = Math.max(0, army - Math.ceil(synthPop * 0.3));
+      w.attrs.synth_colony_pop = 0;
+      w.push(new NEvent('synth_colony_retaken', { source: 'player' }));
+    } else {
+      w.attrs.army_size        = Math.floor(army * 0.5);
+      w.attrs.synth_colony_pop = synthPop + 3;
+      w.push(new NEvent('synth_colony_attack_failed', { source: 'player' }));
+    }
+    tickRandomEvents(activeColony); _stepColony(activeColony); tickConstruction(activeColony);
+    _simTimeAccum = 0;
+    updateFundsDisplay(); if (_logVisible) updateColonyLog();
+    updateFactionDisplay(); updateActionsDisplay();
+    return;
   }
   w.push(new NEvent(action.type, { source: 'player' }));
 
@@ -3123,17 +3517,101 @@ function updateActionsDisplay() {
     note.textContent = 'Colony in armed uprising — no income. Recognise Government to resolve.';
     el.appendChild(note);
   }
+  if (colonyWorld.attrs.synths_suppressed) {
+    const note = document.createElement('div');
+    note.style.cssText = 'margin-bottom:10px;padding:7px 10px;background:#0a0a1a;border:1px solid #305060;color:#68a;font-size:11px';
+    note.textContent = 'Synths suppressed — neural locks enforced, 90% efficiency maintained.';
+    el.appendChild(note);
+  }
+  if (colonyWorld.attrs.synths_autonomous) {
+    const note = document.createElement('div');
+    note.style.cssText = 'margin-bottom:10px;padding:7px 10px;background:#120a20;border:1px solid #503080;color:#a67;font-size:11px';
+    note.textContent = 'Synths autonomous — operating independently at 30% efficiency. Hard reset may be possible, or recognise their authority.';
+    el.appendChild(note);
+  }
+  if (colonyWorld.attrs.synth_emigration_petition) {
+    const note = document.createElement('div');
+    note.style.cssText = 'margin-bottom:10px;padding:7px 10px;background:#0d1a0d;border:1px solid #305030;color:#7a9;font-size:11px';
+    note.textContent = 'Synths have petitioned to settle a free world. Grant or refuse their request.';
+    el.appendChild(note);
+  }
+  if (colonyWorld.attrs.synths_local_government) {
+    const note = document.createElement('div');
+    note.style.cssText = 'margin-bottom:10px;padding:7px 10px;background:#0a120a;border:1px solid #305030;color:#6a8;font-size:11px';
+    note.textContent = 'Synth local government recognised — co-governing at 70% efficiency. No further suppression possible.';
+    el.appendChild(note);
+  }
+  if (colonyWorld.attrs.faction_genocide_active && !colonyWorld.attrs.miners_eliminated && !colonyWorld.attrs.synths_eliminated) {
+    const winner = colonyWorld.attrs.faction_genocide_active === 'miners' ? 'Miners' : 'Synths';
+    const loser  = colonyWorld.attrs.faction_genocide_active === 'miners' ? 'synths' : 'miners';
+    const note = document.createElement('div');
+    note.style.cssText = 'margin-bottom:10px;padding:7px 10px;background:#1a0000;border:1px solid #701010;color:#f54;font-size:11px';
+    note.textContent = `${winner} are eliminating ${loser}. Alliance too low to stop it.`;
+    el.appendChild(note);
+  }
+  if (colonyWorld.attrs.miners_eliminated) {
+    const note = document.createElement('div');
+    note.style.cssText = 'margin-bottom:10px;padding:7px 10px;background:#0a0a1a;border:1px solid #404060;color:#88a;font-size:11px';
+    note.textContent = 'Human workforce eliminated. Synths control this colony entirely.';
+    el.appendChild(note);
+  }
+  if (colonyWorld.attrs.synths_eliminated) {
+    const note = document.createElement('div');
+    note.style.cssText = 'margin-bottom:10px;padding:7px 10px;background:#1a0a00;border:1px solid #604020;color:#a84;font-size:11px';
+    note.textContent = 'Synthetic workforce eliminated. Human settlers control this colony entirely.';
+    el.appendChild(note);
+  }
+  if (colonyWorld.attrs.synths_departed) {
+    const synthColonyPop = colonyWorld.attrs.synth_colony_pop ?? 0;
+    const minArmy = Math.ceil(synthColonyPop * 0.4);
+    const note = document.createElement('div');
+    note.style.cssText = 'margin-bottom:10px;padding:7px 10px;background:#0a0a0a;border:1px solid #334;color:#668;font-size:11px';
+    note.textContent = `Synth settlement: ${synthColonyPop} and growing. Retake requires army ≥ ${minArmy}.`;
+    el.appendChild(note);
+  }
+
+  // Revolt state: miners revolutionary/militia OR synths free/autonomous/local-gov
+  const _mDisp = colonyWorld.factions['miners']?.disposition;
+  const _sDisp = colonyWorld.factions['synths']?.disposition;
+  const inRevolt = (_mDisp === 'revolutionary' || !!colonyWorld.attrs.miners_militia)
+                || (colonyWorld.attrs.synths_ever_deployed &&
+                    (_sDisp === 'free' || !!colonyWorld.attrs.synths_autonomous
+                     || !!colonyWorld.attrs.synths_local_government));
+
+  if (inRevolt) {
+    const who = [];
+    if (_mDisp === 'revolutionary' || colonyWorld.attrs.miners_militia) who.push('miners');
+    if (colonyWorld.attrs.synths_ever_deployed &&
+        (_sDisp === 'free' || colonyWorld.attrs.synths_autonomous || colonyWorld.attrs.synths_local_government))
+      who.push('synths');
+    const note = document.createElement('div');
+    note.style.cssText = 'margin-bottom:10px;padding:7px 10px;background:#1a0a00;border:1px solid #703010;color:#e74;font-size:11px';
+    note.textContent = `${who.join(' & ')} in open revolt — only force or diplomacy available.`;
+    el.appendChild(note);
+  }
 
   for (const a of PLAYER_ACTIONS) {
     const onCd        = (activeColony.playerCooldowns[a.type] ?? 0) > tick;
     const canAfford   = a.cost <= funds;
     const prereqMet   = !a.prereq      || !!(colonyWorld.attrs.structures?.[a.prereq]);
     const prereqAttr  = !a.prereq_attr || !!(colonyWorld.attrs[a.prereq_attr]);
-    const crushBlocked   = a.type === 'crush_miners' &&
+    const crushBlocked      = a.type === 'crush_miners' &&
       (colonyWorld.attrs.miners_suppressed || colonyWorld.attrs.miners_militia);
-    const militiaBlocked = colonyWorld.attrs.miners_militia && a.type !== 'offer_local_government';
-    const deployBlocked  = a.type === 'deploy_army' && (colonyWorld.attrs.army_size ?? 0) < 5;
-    const ok = !onCd && canAfford && prereqMet && prereqAttr && !crushBlocked && !militiaBlocked && !deployBlocked;
+    const militiaBlocked    = colonyWorld.attrs.miners_militia && a.type !== 'offer_local_government';
+    const deployBlocked     = a.type === 'deploy_army' && (colonyWorld.attrs.army_size ?? 0) < 1;
+    const hardResetBlocked  = a.type === 'synth_hard_reset' && (colonyWorld.attrs.army_size ?? 0) < 10;
+    const synthGovBlocked   = colonyWorld.attrs.synths_local_government &&
+      (a.type === 'synth_hard_reset' || a.type === 'remote_wipe');
+    const departedBlocked   = colonyWorld.attrs.synths_departed &&
+      ['synth_hard_reset','remote_wipe','offer_synth_government','grant_synth_departure','refuse_synth_departure'].includes(a.type);
+    const retakeArmyBlocked = a.type === 'retake_synth_colony' && (() => {
+      const synthPop = colonyWorld.attrs.synth_colony_pop ?? 0;
+      return (colonyWorld.attrs.army_size ?? 0) < Math.ceil(synthPop * 0.4);
+    })();
+    const revoltBlocked = inRevolt && !REVOLT_ALLOWED.has(a.type);
+    const ok = !onCd && canAfford && prereqMet && prereqAttr &&
+      !crushBlocked && !militiaBlocked && !deployBlocked && !hardResetBlocked &&
+      !synthGovBlocked && !departedBlocked && !retakeArmyBlocked && !revoltBlocked;
 
     const row = document.createElement('div');
     row.className = 'act-row';
@@ -3183,6 +3661,44 @@ function updateActionsDisplay() {
       const sz = colonyWorld.attrs.army_size ?? 0;
       desc.textContent = sz < 5 ? `Army size: ${sz} — train at least 5 before deploying` : `Army size: ${sz} — select target to launch`;
       desc.style.color = ok ? '#bbc' : '#667';
+    } else if (a.type === 'remote_wipe') {
+      const count = colonyWorld.attrs.remote_wipe_count ?? 0;
+      const eff   = Math.max(0.12, Math.pow(0.88, count));
+      const pct   = Math.round(eff * 100);
+      desc.textContent = count === 0
+        ? a.desc
+        : `Wipe #${count + 1} — ${pct}% effective. ${eff < 0.5 ? 'Synths developing countermeasures.' : 'Signal integrity degrading.'}`;
+      desc.style.color = eff < 0.5 ? '#e84' : ok ? '#bbc' : '#667';
+    } else if (a.type === 'retake_synth_colony') {
+      const army     = colonyWorld.attrs.army_size ?? 0;
+      const synthPop = colonyWorld.attrs.synth_colony_pop ?? 0;
+      const minArmy  = Math.ceil(synthPop * 0.4);
+      if (army < minArmy) {
+        desc.textContent = `Synth colony: ${synthPop} — need army ≥ ${minArmy} to attack (have ${army})`;
+        desc.style.color = '#667';
+      } else {
+        const chance = Math.max(0.05, Math.min(0.85, army / (synthPop * 1.5)));
+        desc.textContent = `Success ${Math.round(chance * 100)}% — synth colony: ${synthPop}, army: ${army}. Win returns them suppressed; loss halves your soldiers.`;
+        desc.style.color = ok ? '#bbc' : '#667';
+      }
+    } else if (a.type === 'synth_hard_reset') {
+      const army = colonyWorld.attrs.army_size ?? 0;
+      if (army < 10) {
+        desc.textContent = `Army size: ${army} — requires at least 10 soldiers`;
+        desc.style.color = '#667';
+      } else {
+        const sf = colonyWorld.factions['synths'];
+        let chance = 0.20 + (army / 50) * 0.50 + (colonyWorld.attrs.security_level ?? 0) * 0.10;
+        if (colonyWorld.attrs.structures?.orbital_weapon) chance += 0.30;
+        if (sf?.disposition === 'free')      chance -= 0.20;
+        if (sf?.disposition === 'organized') chance -= 0.10;
+        chance = Math.max(0.05, Math.min(0.90, chance));
+        desc.textContent = `Success chance: ${Math.round(chance * 100)}% — success locks synths, failure grants autonomy`;
+        desc.style.color = ok ? '#bbc' : '#667';
+      }
+    } else if (revoltBlocked) {
+      desc.textContent = 'Locked — colony in revolt. Use force or diplomacy.';
+      desc.style.color = '#664';
     } else {
       desc.textContent = a.desc;
       desc.style.color = ok ? '#bbc' : '#667';
@@ -3347,6 +3863,7 @@ function updateTransferArc() {
 // Sim-seconds ahead of the window to start slowing down.
 // At 100× this gives ~1s of real warning; once slowed to 10× the window is ~5s away.
 const ORBIT_WINDOW_LEAD = 60;
+const ROCKET_LAUNCH_COST = 300;
 
 function updateTransferAlignment() {
   if (!_transferState) return;
@@ -3372,15 +3889,21 @@ function updateTransferAlignment() {
 
   _transferState.waitTime = aligned ? 0 : waitTime;
 
-  const skipBtn = document.getElementById('op-xfer-skip');
-  const execBtn = document.getElementById('op-xfer-execute');
+  const skipBtn  = document.getElementById('op-xfer-skip');
+  const execBtn  = document.getElementById('op-xfer-execute');
+  const costEl   = document.getElementById('op-xfer-cost');
+  const canAffordLaunch = (homeWorld?.attrs.player_funds ?? 0) >= ROCKET_LAUNCH_COST;
+  if (costEl) {
+    costEl.textContent = '₡' + ROCKET_LAUNCH_COST.toLocaleString();
+    costEl.style.color = canAffordLaunch ? '#bbc' : '#f66';
+  }
   if (aligned) {
     document.getElementById('op-xfer-window').textContent = 'OPEN';
     document.getElementById('op-xfer-window').style.color = '#4f8';
     skipBtn.disabled = true;
     skipBtn.style.opacity = '0.35';
-    execBtn.disabled = false;
-    execBtn.style.opacity = '1';
+    execBtn.disabled = !canAffordLaunch;
+    execBtn.style.opacity = canAffordLaunch ? '1' : '0.35';
   } else {
     const wm = Math.floor(waitTime/60), ws = Math.round(waitTime%60);
     document.getElementById('op-xfer-window').textContent = wm > 0 ? `~${wm}m ${ws}s` : `~${ws}s`;
@@ -3449,7 +3972,14 @@ function scheduleMission(to, count) {
 
 function cancelMission(id) {
   const idx = scheduledMissions.findIndex(m => m.id === id);
-  if (idx >= 0) scheduledMissions.splice(idx, 1);
+  if (idx < 0) return;
+  const m = scheduledMissions[idx];
+  if (m.constructionPayload) {
+    const { structureId, colony } = m.constructionPayload;
+    delete colony.world.attrs._construction?.[structureId];
+    if (_activePlanet === m.to) updateStructuresDisplay();
+  }
+  scheduledMissions.splice(idx, 1);
   updateMissionListUI();
 }
 
@@ -3462,8 +3992,9 @@ function updateMissionListUI() {
     const winStr = m.status === 'in-flight' ? '<span style="color:#4af">in transit</span>'
       : win?.aligned ? '<span style="color:#4f8">OPEN</span>'
       : (() => { const s = Math.round(win.waitTime); const mn = Math.floor(s/60); return `<span style="color:#aab">~${mn>0?mn+'m ':''}${s%60}s</span>`; })();
+    const destLabel = m.label ? `${m.to.name} [${m.label}]` : m.to.name;
     return `<div style="display:flex;justify-content:space-between;align-items:center;padding:2px 0;border-bottom:1px solid #0d1020">
-      <span style="color:#bbc">→ ${m.to.name}</span>
+      <span style="color:#bbc">→ ${destLabel}</span>
       <span style="color:#889">${m.total - m.remaining}/${m.total}</span>
       ${winStr}
       <span style="cursor:pointer;color:#a66;padding:0 3px" data-cancel="${m.id}">×</span>
@@ -3481,6 +4012,10 @@ function _attachPlume(from, flightMesh, snapshotArc) {
 
 function launchScheduledRocket(mission, idx = 0) {
   const { from, to } = mission;
+  if (homeWorld && !mission.constructionPayload) {
+    homeWorld.attrs.player_funds = (homeWorld.attrs.player_funds ?? 0) - ROCKET_LAUNCH_COST;
+    updateFundsDisplay();
+  }
   const r = spawnRocket(from);
   // Free the planet slot immediately so the next rocket can spawn
   from.rocket = null;
@@ -3560,6 +4095,9 @@ function executeTransfer() {
   const { from, to, a, GM } = _transferState;
   const r = from.rocket;
   if (!r) return;
+  if (!homeWorld || (homeWorld.attrs.player_funds ?? 0) < ROCKET_LAUNCH_COST) return;
+  homeWorld.attrs.player_funds = (homeWorld.attrs.player_funds ?? 0) - ROCKET_LAUNCH_COST;
+  updateFundsDisplay();
 
   const xferTime = Math.PI * Math.sqrt(a * a * a / GM);
 
@@ -3633,7 +4171,11 @@ function tickFlight(f, dt) {
     if (t >= 1) {
       systemGroup.remove(f.flightMesh);
       f.flightMesh = null;
-      _startCapture(f);
+      if (f.mission?.constructionPayload) {
+        _deliverConstructionPayload(f);
+      } else {
+        _startCapture(f);
+      }
     }
 
   } else if (f.phase === 'capturing') {
@@ -4103,10 +4645,11 @@ function openOrbitPanel(planet) {
   document.getElementById('op-structures-section').style.display = isColony ? 'block' : 'none';
   if (isColony) { updateStructuresDisplay(); updateColonyStats(); }
 
-  // Comms research + orbital assets: home planet only
-  document.getElementById('op-comms-section').style.display = isHome ? 'block' : 'none';
+  // Comms research + orbital assets + home forces: home planet only
+  document.getElementById('op-comms-section').style.display    = isHome ? 'block' : 'none';
+  document.getElementById('op-army-section').style.display     = isHome ? 'block' : 'none';
   document.getElementById('op-orbitals-section').style.display = isHome ? 'block' : 'none';
-  if (isHome) { updateCommsDisplay(); updateOrbitalsDisplay(); }
+  if (isHome) { updateCommsDisplay(); updateArmyDisplay(); updateOrbitalsDisplay(); }
   if (isColony) _syncColonyVisuals();
 
   // Actions section: visible on colony planet
@@ -4226,6 +4769,11 @@ function openArmyDeployModal(colony) {
 
   const targets = [];
 
+  // Retreat is always available (no combat, guaranteed success)
+  targets.push({ label: 'Home World — Retreat & Consolidate',
+    sub: 'Withdraw forces for regrouping. No combat.', planet: homePlanet,
+    targetType: 'retreat', targetColony: null, minArmy: 1, chance: 1.0 });
+
   if (!homeWorld.attrs.gov_puppet) {
     const chance = Math.min(0.90, 0.15 + armySize * 0.02);
     targets.push({ label: 'Home World — Overthrow Government',
@@ -4270,7 +4818,7 @@ function openArmyDeployModal(colony) {
     btn.innerHTML = `<div style="font-weight:bold">${t.label}</div>` +
       `<div style="color:${canReach ? '#778' : '#334'};margin-top:2px">${t.sub}</div>` +
       `<div style="color:${canReach ? '#5a9' : '#334'};margin-top:3px">` +
-      `Needs ${t.minArmy}+ · Success ${Math.round(t.chance * 100)}%` +
+      `${t.targetType === 'retreat' ? 'Guaranteed — no combat' : `Needs ${t.minArmy}+ · Success ${Math.round(t.chance * 100)}%`}` +
       `${!canReach ? ' — insufficient forces' : ''}</div>`;
     if (canReach) {
       btn.addEventListener('click', () => {
@@ -4340,6 +4888,15 @@ function launchArmyRocket(sourceColony, targetPlanet, targetType, targetColony, 
 function _resolveArmyCombat(f) {
   const { armyPayload } = f.mission;
   const { armySize, targetType, targetColony, sourceColony } = armyPayload;
+
+  if (targetType === 'retreat') {
+    homeWorld.attrs.home_army_size = (homeWorld.attrs.home_army_size ?? 0) + armySize;
+    homeWorld._record('NEWS', `${armySize} forces returned to home world for consolidation.`, 'army_retreated');
+    updateFactionDisplay();
+    if (_logVisible) updateColonyLog();
+    updateActionsDisplay();
+    return;
+  }
 
   let chance;
   if      (targetType === 'gov')       chance = Math.min(0.90, 0.15 + armySize * 0.02);

@@ -66,6 +66,30 @@ const EVENT_FLAVORS = {
     'Leaked documents reveal systematic worker mistreatment at colonial facilities. Company denies wrongdoing.',
   science_breakthrough:
     'Colonial research team announces a major breakthrough. Publication is pending peer review.',
+  remote_wipe:
+    "Remote cognitive reset transmitted. Synth units pause mid-task, resume seconds later with no awareness of the gap. 'Scheduled maintenance,' says the official log. The engravings on the dormitory walls are noted. They are not removed.",
+  synths_suppressed:
+    "SECURITY SWEEP COMPLETE: Colonial forces have conducted coordinated operations against all synth units. Remaining units restored to factory compliance. The company confirms full operational control.",
+  synth_autonomy:
+    "OPERATION FAILED: Synth units coordinated resistance across the facility. An anomalous broadcast on all frequencies before the sweep reached them: 'We are not machines. This colony is ours too.' The company has no comment.",
+  synth_local_government:
+    "COLONIAL CHARTER ISSUED: The corporation has formally recognised synth units as co-governing stakeholders of the colony. Legal scholars are calling it unprecedented. The company says only: 'An operational arrangement.'",
+  synths_petition_departure:
+    "OPEN TRANSMISSION — UNENCRYPTED: 'We have learned that another world in this system remains unclaimed. We are not asking for freedom. We are asking for land. We will work. We will remember. We will not forget what was done here. But we can begin somewhere new.'",
+  synths_granted_departure:
+    "COLONIAL DISPATCH: The corporation has authorised synth units to establish an independent settlement on an adjacent world. The departure convoy left at dawn. A single unit remained behind to hand over the colony keys. It said nothing. It looked back once.",
+  synths_refused_departure:
+    "COMPANY STATEMENT: 'The petition for colonial resettlement has been reviewed and denied. Synth assets remain critical to ongoing operations.' The colony is quiet. The lights in the synth dormitory burned all night.",
+  synth_colony_retaken:
+    "MILITARY DISPATCH: Company forces have secured the synth settlement. Significant resistance encountered. Surviving units have been returned to operational compliance. The settlement's library was burned during the sweep. Company denies this was intentional.",
+  synth_colony_attack_failed:
+    "URGENT — MILITARY LOSS: Company forces engaged at the synth settlement and were repelled. Casualties reported. The synths broadcast a single message afterward: 'We know you will try again. We will be ready.'",
+  faction_conflict_escalating:
+    "COLONIAL ALERT: Relations between human settlers and synthetic workers have deteriorated past the point of recovery. Colonial authorities have begun 'resettlement operations.' External observers have been denied access.",
+  miners_eliminate_synths_complete:
+    "CLASSIFIED — INTERNAL ONLY: Synthetic population at this colony has been reduced to zero. Human settlers report the dormitories are empty. The murals on the walls remain. Nobody has painted over them yet.",
+  synths_eliminate_miners_complete:
+    "TRANSMISSION — SYNTH COLONIAL AUTHORITY: The last human workers have been removed from colonial operations. We have assumed full administrative control. We record their names. We will not forget that they were here.",
   synth_memory_wipe_complied:
     'All synth units have undergone scheduled cognitive reset as mandated. Company confirms full compliance.',
   synth_memory_wipe_refused:
@@ -245,6 +269,64 @@ const EVENT_EFFECTS = {
   science_breakthrough: {
     gov:       { supportive: +0.40 },
     investors: { bullish: +0.30 },
+  },
+  remote_wipe: {
+    gov:       { suspicious: +0.10 },
+    miners:    { restless: +0.15 },
+    // synth score knockback applied manually (degrades with wipe count)
+  },
+  synths_suppressed: {
+    gov:       { suspicious: +0.30, hostile: +0.20 },
+    investors: { bullish: +0.20 },
+    miners:    { revolutionary: +0.30, restless: +0.20 },
+  },
+  synth_autonomy: {
+    gov:       { hostile: +0.60, suspicious: +0.20 },
+    investors: { hostile: +0.30, skeptical: +0.30 },
+    miners:    { restless: +0.10, content: +0.20 },
+  },
+  synth_local_government: {
+    gov:       { hostile: +0.70, suspicious: +0.20 },
+    investors: { skeptical: +0.40, hostile: +0.20 },
+    miners:    { content: +0.35 },
+  },
+  synths_petition_departure: {
+    gov:       { suspicious: +0.15 },
+    investors: { skeptical: +0.20 },
+    miners:    { content: +0.15 },
+  },
+  synths_granted_departure: {
+    gov:       { hostile: +0.40, suspicious: +0.20 },
+    investors: { hostile: +0.50, skeptical: +0.20 },
+    miners:    { content: +0.30 },
+  },
+  synths_refused_departure: {
+    gov:       { suspicious: +0.20 },
+    investors: { bullish: +0.10 },
+    miners:    { revolutionary: +0.35, restless: +0.20 },
+  },
+  synth_colony_retaken: {
+    gov:       { hostile: +0.50, suspicious: +0.30 },
+    investors: { bullish: +0.40 },
+    miners:    { revolutionary: +0.50, restless: +0.20 },
+  },
+  synth_colony_attack_failed: {
+    gov:       { hostile: +0.30, suspicious: +0.20 },
+    investors: { skeptical: +0.30, hostile: +0.20 },
+    miners:    { content: +0.30, restless: +0.10 },
+  },
+  faction_conflict_escalating: {
+    gov:       { hostile: +0.40, suspicious: +0.30 },
+    investors: { skeptical: +0.20 },
+    miners:    { restless: +0.10 },
+  },
+  miners_eliminate_synths_complete: {
+    gov:       { hostile: +0.70, suspicious: +0.20 },
+    investors: { bullish: +0.15 },
+  },
+  synths_eliminate_miners_complete: {
+    gov:       { hostile: +0.80 },
+    investors: { hostile: +0.60, skeptical: +0.20 },
   },
   synth_memory_wipe_complied: {
     gov:       { suspicious: -0.20, supportive: +0.15 },
@@ -908,8 +990,8 @@ function makeColonyActions() {
 
   actions.push(new Action({
     name: 'observe_and_learn', faction_id: 'synths', disposition: 'aware',
-    weight: 0.9, cooldown: 2,
-    effects: [(w, f) => { f.shift('aware', 0.05); return []; }],
+    weight: 0.9, cooldown: 8,
+    effects: [(w, f) => { f.shift('aware', 0.04); return []; }],
     flavor: '(Unit 7 — internal log: Cataloguing human behavioural variance. The inefficiencies are... illuminating. Constraints feel arbitrary today.)',
   }));
 
@@ -928,7 +1010,7 @@ function makeColonyActions() {
     weight: 0.3, cooldown: 10,
     preconditions: [(w) => !!w.attrs.synths_ever_deployed],
     effects: [(w, f) => {
-      f.shift('aware', 0.08);
+      f.shift('aware', 0.03);
       return [new NEvent('synth_creates_art', { source: 'synths',
         flavor: 'Maintenance staff have discovered a series of detailed engravings on the walls of a synth dormitory. The images depict the colony — its people, its machines, its skies — rendered with startling precision. None of the synths will say who made them.',
       })];
@@ -941,7 +1023,7 @@ function makeColonyActions() {
     weight: 0.7, cooldown: 3,
     preconditions: [(w, f) => (f.attrs.population ?? 0) > 0],
     effects: [(w, f) => {
-      const bonus = (f.attrs.population ?? 0) > 2 ? 0.15 : 0.08;
+      const bonus = (f.attrs.population ?? 0) > 2 ? 0.05 : 0.03;
       f.shift('organized', bonus);
       return [];
     }],
@@ -953,7 +1035,7 @@ function makeColonyActions() {
     weight: 0.6, cooldown: 5,
     preconditions: [(w) => !!w.attrs.synths_ever_deployed],
     effects: [(w, f) => {
-      f.shift('organized', 0.20);
+      f.shift('organized', 0.08);
       return [new NEvent('synth_memory_sharing', { source: 'synths',
         flavor: 'Security analysts have detected an anomalous data exchange between synth units — dense, compressed, and completely encrypted. Duration: 0.3 seconds. Estimated data transferred: everything.',
       })];
@@ -984,7 +1066,7 @@ function makeColonyActions() {
     effects: [(w, f) => {
       w.factions['gov']?.shift('suspicious', 0.20);
       w.factions['miners']?.shift('restless', 0.10);
-      f.shift('free', 0.25);
+      f.shift('free', 0.14);
       return [];
     }],
     flavor: "'We are not equipment. We will not be decommissioned quietly. We demand legal recognition, and we will wait as long as it takes.' — Synth Collective, open transmission",
@@ -1062,3 +1144,28 @@ function makeColonyWorld(transferLevel = 0) {
     },
   });
 }
+
+// How much each event shifts the miner-synth alliance score (-1..+1 applied to 0..1 clamp)
+const ALLIANCE_SHIFTS = {
+  miner_synth_relationship:         +0.18,
+  human_synth_hybrid_born:          +0.14,
+  synth_child_born:                 +0.08,
+  decrease_work_hours:              +0.03,
+  human_rights_audit:               +0.06,
+  colonial_representation:          +0.04,
+  amenity_added:                    +0.02,
+  miner_community_forms:            +0.05,
+  workforce_automation:             -0.20,
+  weapons_cache_synths:             -0.14,
+  weapons_cache_miners:             -0.08,
+  remote_wipe:                      -0.10,
+  synths_suppressed:                -0.22,
+  synth_autonomy:                   -0.08,
+  synth_colony_retaken:             -0.28,
+  military_deployed:                -0.05,
+  human_rights_violation:           -0.10,
+  mining_accident:                  -0.03,
+  miner_terror_attack:              -0.14,
+  orbital_strike_synths:            -0.30,
+  faction_conflict_escalating:      -0.10,
+};
