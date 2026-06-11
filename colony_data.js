@@ -179,6 +179,15 @@ const EVENT_FLAVORS = {
   mass_casualties:
     'CRITICAL: Multiple colonial life support systems have failed simultaneously. Casualty numbers are not yet confirmed. Emergency protocols are active.',
 
+  comet_flyby:
+    'A long-period comet crosses the colonial sky, trailing a tail of ionized dust visible even at noon. Work stops for an hour across every sector. Nobody is reprimanded.',
+  meteor_strike:
+    'IMPACT ALERT: A meteoroid cluster has struck near the colonial perimeter. Structural damage to outlying installations. Casualties reported among surface crews.',
+  aurora_storm:
+    'Charged particles from the stellar wind ignite auroras across the colonial sky. Shift workers gather on the observation decks. For one night, the colony is quiet in a good way.',
+  smuggler_ring:
+    'Colonial security has uncovered a smuggling operation moving refined ore off-manifest. Several logistics officers are in custody. The missing inventory is presumed sold.',
+
   transfer_tech_researched:
     'Propulsion research complete. Non-optimal transfer trajectories are now viable. Transfer windows are no longer mandatory — though fuel costs are higher.',
   alien_propulsion_integrated:
@@ -525,6 +534,25 @@ const EVENT_EFFECTS = {
     miners:    { restless: +0.25, content: -0.20 },
     synths:    { aware: +0.10 },
   },
+  comet_flyby: {
+    gov:       { supportive: +0.05 },
+    miners:    { content: +0.15, restless: -0.05 },
+    synths:    { aware: +0.05 },
+  },
+  meteor_strike: {
+    gov:       { watchful: +0.15 },
+    investors: { skeptical: +0.10 },
+    miners:    { restless: +0.25, content: -0.10 },
+    synths:    { aware: +0.05 },
+  },
+  aurora_storm: {
+    miners:    { content: +0.20, restless: -0.10 },
+    synths:    { aware: +0.08 },
+  },
+  smuggler_ring: {
+    gov:       { suspicious: +0.20 },
+    investors: { skeptical: +0.15 },
+  },
   solar_flare: {},  // base event — no faction effects; see solar_flare_unrest for conditional escalation
   solar_flare_unrest: {
     miners: { restless: +0.25, striking: +0.15 },
@@ -778,7 +806,9 @@ function makeHomeActions() {
   actions.push(new Action({
     name: 'revoke_license', faction_id: 'gov', disposition: 'hostile',
     weight: 0.5, cooldown: 15,
-    preconditions: [(w, f) => (f.attrs.sanctions ?? 0) >= 2],
+    // Requires a third sanction after the charter warning fires at 2 — its
+    // cooldown guarantees the player a window to bribe/cooperate before loss.
+    preconditions: [(w, f) => (f.attrs.sanctions ?? 0) >= 3],
     effects: [(w, f) => {
       f.attrs.sanctions += 3;
       return [new NEvent('gov_sanctions', { source: 'gov', magnitude: 2.0,
@@ -1113,7 +1143,7 @@ function makeHomeWorld() {
     event_flavors: EVENT_FLAVORS,
     transfer: new TransferConfig({ mode: 'instant', travel_time: 0 }),
     attrs: {
-      player_funds: 1000,
+      player_funds: 1200,
       permit_speed: 1.0,
       transfer_level: 0,
     },

@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Solar System Generator</title>
+  <title>ΔV — Colony Command</title>
   <style>
     /* ── Palette ─────────────────────────────────────────────
        text-hi:   #eef   bright primary
@@ -42,6 +42,34 @@
     }
     .btn:hover  { background: #141428; color: #eef; }
     .btn.active { background: #1a2a5a; color: #6af; border-color: #4a6aaa; }
+    .btn.primary { background: #0d2418; border-color: #2a7a4a; color: #5fc; font-weight: bold; }
+    .btn.primary:hover:not(:disabled) { background: #14331f; color: #8fe; }
+    .btn.primary:disabled { background: #0d0d1a; border-color: #1a2a3a; color: #3a4a5a; font-weight: normal; cursor: default; }
+
+    /* ── System menu (worldgen controls) ─────────────────── */
+    #system-menu {
+      position: fixed; top: 48px; left: 10px; z-index: 200;
+      background: #0a0a16; border: 1px solid #2a3a5a; border-radius: 6px;
+      padding: 12px 14px; width: 250px; font-size: 12px;
+      box-shadow: 0 4px 24px rgba(0,0,0,0.7);
+    }
+    .sm-row { display: flex; align-items: center; gap: 8px; margin-bottom: 9px; }
+    .sm-row .ctrl-label { width: 58px; flex-shrink: 0; }
+    .sm-actions { display: flex; gap: 6px; flex-wrap: wrap; }
+    .sm-actions .btn { flex: 1; text-align: center; }
+
+    /* ── Collapsible section headers ──────────────────────── */
+    .op-soi-header.collapsible { cursor: pointer; user-select: none; }
+    .op-soi-header.collapsible:hover .op-soi-name { color: #ffd9a0; }
+    .op-collapse-arrow { font-size: 9px; color: #889; }
+
+    /* ── Auto-launch arm ──────────────────────────────────── */
+    .xfer-auto-label {
+      display: flex; align-items: center; gap: 5px; font-size: 11px;
+      color: #bbc; cursor: pointer; user-select: none;
+    }
+    .xfer-auto-label input { accent-color: #5fc; cursor: pointer; }
+    .xfer-auto-label.armed { color: #5fc; }
 
     /* ── Sidebar ─────────────────────────────────────────── */
     #sidebar {
@@ -210,22 +238,88 @@
       animation: launch-pulse 0.7s ease-in-out infinite;
     }
     @keyframes launch-pulse { 0%,100% { opacity:1; } 50% { opacity:0.45; } }
+
+    /* ── Event toasts ────────────────────────────────────── */
+    #toasts {
+      position: fixed; top: 96px; left: 50%; transform: translateX(-50%);
+      z-index: 500; display: flex; flex-direction: column; gap: 6px;
+      align-items: center; pointer-events: none; max-width: 560px;
+    }
+    .toast {
+      background: rgba(8,8,18,0.94); border: 1px solid #2a3a5a; border-left-width: 3px;
+      border-radius: 4px; padding: 6px 14px; font-size: 12px; line-height: 1.45;
+      color: #ccd; max-width: 560px; box-shadow: 0 2px 14px rgba(0,0,0,0.6);
+      animation: toast-in 0.22s ease-out; transition: opacity 0.5s, transform 0.5s;
+    }
+    .toast .toast-src { font-weight: bold; margin-right: 6px; }
+    .toast.t-good   { border-left-color: #3da97a; } .toast.t-good   .toast-src { color: #5fc; }
+    .toast.t-warn   { border-left-color: #cc8a2a; } .toast.t-warn   .toast-src { color: #fc8; }
+    .toast.t-danger { border-left-color: #cc3322; } .toast.t-danger .toast-src { color: #f76; }
+    .toast.t-out    { opacity: 0; transform: translateY(-8px); }
+    @keyframes toast-in { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: none; } }
+
+    /* ── Objectives / directives widget ───────────────────── */
+    #objectives {
+      position: fixed; top: 54px; right: 200px; width: 252px;
+      background: rgba(8,8,16,0.92); border: 1px solid #2a3a5a; border-radius: 6px;
+      z-index: 15; font-size: 11px; padding: 8px 11px 9px;
+    }
+    #objectives h4 {
+      color: #bbc; font-size: 10px; text-transform: uppercase; letter-spacing: 1px;
+      margin-bottom: 6px; display: flex; justify-content: space-between; align-items: center;
+    }
+    #objectives h4 .obj-min { cursor: pointer; color: #889; padding: 0 4px; }
+    #objectives h4 .obj-min:hover { color: #eef; }
+    .obj-step { display: flex; gap: 7px; padding: 2px 0; color: #99a; line-height: 1.45; }
+    .obj-step.done    { color: #4a6; }
+    .obj-step.current { color: #dde; }
+    .obj-step .obj-tick { flex-shrink: 0; width: 12px; }
+    .obj-bar-wrap { height: 3px; background: #1a1a2a; border-radius: 2px; overflow: hidden; margin: 2px 0 4px; }
+    .obj-bar { height: 100%; background: #4a8; transition: width 0.4s; }
+    .obj-warn { color: #f76; }
+
+    /* ── Endgame overlay ─────────────────────────────────── */
+    #endgame {
+      position: fixed; inset: 0; z-index: 2000;
+      background: radial-gradient(ellipse at center, rgba(4,6,16,0.88) 0%, rgba(0,0,4,0.97) 100%);
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      animation: eg-in 1.1s ease-out;
+    }
+    @keyframes eg-in { from { opacity: 0; } to { opacity: 1; } }
+    #eg-kicker { font-size: 12px; letter-spacing: 5px; text-transform: uppercase; color: #889; margin-bottom: 14px; }
+    #eg-title  { font-size: 42px; letter-spacing: 10px; text-transform: uppercase; font-weight: bold; margin-bottom: 26px; text-align: center; }
+    #eg-title.eg-win  { color: #6fd; text-shadow: 0 0 34px rgba(80,255,200,0.45); }
+    #eg-title.eg-lose { color: #f65; text-shadow: 0 0 34px rgba(255,80,60,0.45); }
+    #eg-epilogue {
+      max-width: 620px; color: #aab; font-size: 13px; line-height: 1.75; text-align: center;
+      margin-bottom: 28px; padding: 0 24px; white-space: pre-line;
+    }
+    #eg-stats {
+      display: flex; gap: 34px; margin-bottom: 34px; flex-wrap: wrap; justify-content: center;
+    }
+    .eg-stat { text-align: center; }
+    .eg-stat .v { font-size: 22px; color: #dde; font-family: monospace; }
+    .eg-stat .k { font-size: 10px; color: #778; text-transform: uppercase; letter-spacing: 1.5px; margin-top: 3px; }
+    #eg-buttons { display: flex; gap: 12px; }
+    #eg-buttons .btn { font-size: 13px; padding: 8px 22px; }
+
+    /* ── Funds pulse ──────────────────────────────────────── */
+    @keyframes funds-up   { 0% { color: #bfd; text-shadow: 0 0 10px #5fc; } 100% { color: #5fc; } }
+    @keyframes funds-down { 0% { color: #f87; text-shadow: 0 0 10px #f55; } 100% { color: #5fc; } }
+    #topbar-funds.f-up   { animation: funds-up 0.8s ease-out; }
+    #topbar-funds.f-down { animation: funds-down 0.8s ease-out; }
+
+    /* ── Survey block ─────────────────────────────────────── */
+    .survey-row { display: flex; justify-content: space-between; font-size: 11px; padding: 1px 0; color: #bbc; }
+    .survey-row span:last-child { color: #eef; font-family: monospace; }
   </style>
 </head>
 <body>
 <div id="canvas-container"></div>
 
 <div id="topbar">
-  <h1>Solar System</h1>
-  <span class="ctrl-label">Seed</span>
-  <input type="number" id="seed-input" value="42" min="0" max="999999">
-  <span class="ctrl-label">Planets</span>
-  <input type="range" id="planet-count" min="2" max="10" step="1" value="6">
-  <span id="planet-count-val" style="font-size:11px;color:#bbc;min-width:12px">6</span>
-  <button class="btn" id="btn-generate">Generate</button>
-  <button class="btn" id="btn-random">Random Seed</button>
-  <button class="btn active" id="btn-orbits">Orbits: ON</button>
-  <button class="btn" id="btn-asteroid">Asteroid Belt</button>
+  <h1>ΔV · Colony Command</h1>
+  <button class="btn" id="btn-system" title="World generation & display options">System ▾</button>
 
   <span style="width:1px;background:#1a1a2e;align-self:stretch;margin:6px 2px"></span>
   <button class="btn" id="btn-slower">−</button>
@@ -234,10 +328,34 @@
   <button class="btn" id="btn-pause">⏸</button>
   <span style="width:1px;background:#1a1a2e;align-self:stretch;margin:6px 2px"></span>
   <span id="topbar-funds" style="display:none"></span>
+  <span id="topbar-market" style="display:none;font-size:11px;white-space:nowrap" title="Ore market price — colony income scales with it"></span>
   <span id="topbar-pop" style="display:none"></span>
+  <span style="flex:1"></span>
   <button class="btn" id="btn-log" style="display:none">News</button>
   <button class="btn" id="btn-factions" style="display:none">Factions</button>
-  <button class="btn" id="btn-control-overlay" style="display:none">Control</button>
+  <button class="btn" id="btn-objectives" style="display:none">Directives</button>
+  <button class="btn" id="btn-mute" title="Toggle sound (M)">🔊</button>
+</div>
+
+<div id="system-menu" style="display:none">
+  <div class="sm-row">
+    <span class="ctrl-label">Seed</span>
+    <input type="number" id="seed-input" value="42" min="0" max="999999">
+  </div>
+  <div class="sm-row">
+    <span class="ctrl-label">Planets</span>
+    <input type="range" id="planet-count" min="2" max="10" step="1" value="6" style="flex:1">
+    <span id="planet-count-val" style="font-size:11px;color:#bbc;min-width:12px">6</span>
+  </div>
+  <div class="sm-actions" style="margin-bottom:9px">
+    <button class="btn" id="btn-generate">Generate</button>
+    <button class="btn" id="btn-random">Random Seed</button>
+  </div>
+  <div class="sm-actions">
+    <button class="btn active" id="btn-orbits">Orbits: ON</button>
+    <button class="btn" id="btn-asteroid">Asteroids</button>
+    <button class="btn" id="btn-control-overlay" style="display:none">Control</button>
+  </div>
 </div>
 
 <div id="sidebar">
@@ -245,7 +363,7 @@
   <div id="planet-entries"></div>
 </div>
 
-<div id="hint">Drag · Scroll to zoom · Click planet to lock camera · Click again or Star to unlock · Click HOME or SAT planet to open rocket panel</div>
+<div id="hint">Drag to orbit · Scroll to zoom · Click a planet to open its panel · Space pause · +/− speed</div>
 
 <div id="orbit-panel" style="display:none">
   <div class="op-header">
@@ -256,102 +374,35 @@
   <div id="op-no-rocket" style="display:none;padding:10px 0 4px">
     <p style="color:#aab;font-size:11px;margin-bottom:10px">No satellite in orbit. Build one to begin exploring.</p>
     <div style="display:flex;justify-content:flex-end">
-      <button class="btn" id="op-spawn">Launch Rocket</button>
+      <button class="btn primary" id="op-spawn">Launch Rocket</button>
     </div>
   </div>
 
   <div id="op-rocket-content">
-  <table class="op-table">
-    <thead><tr><th>Element</th><th>Current</th><th>Target</th><th></th></tr></thead>
-    <tbody>
-      <tr>
-        <td>Semi-major axis</td>
-        <td id="op-sma-cur"></td>
-        <td><input type="range" id="sl-sma" step="0.1"></td>
-        <td id="op-sma-val"></td>
-      </tr>
-      <tr>
-        <td>Eccentricity</td>
-        <td id="op-ecc-cur"></td>
-        <td><input type="range" id="sl-ecc" min="0" step="0.001"></td>
-        <td id="op-ecc-val"></td>
-      </tr>
-      <tr>
-        <td>Inclination</td>
-        <td id="op-inc-cur"></td>
-        <td><input type="range" id="sl-inc" min="-90" max="90" step="0.5"></td>
-        <td id="op-inc-val"></td>
-      </tr>
-      <tr>
-        <td>Arg. periapsis</td>
-        <td id="op-arg-cur"></td>
-        <td><input type="range" id="sl-arg" min="0" max="360" step="1"></td>
-        <td id="op-arg-val"></td>
-      </tr>
-    </tbody>
-  </table>
-
-  <div class="op-derived">
-    <span class="lbl">Apogee alt.</span>
-    <span class="cur" id="op-apo-cur"></span>
-    <span class="arr">→</span>
-    <span></span>
-    <span class="tgt" id="op-apo-new"></span>
-    <span class="lbl">Perigee alt.</span>
-    <span class="cur" id="op-per-cur"></span>
-    <span class="arr">→</span>
-    <span></span>
-    <span class="tgt" id="op-per-new"></span>
-  </div>
-
-  <div class="op-cost-block">
-    <div class="op-cost-row"><span>Maneuver cost</span><span id="op-cost"></span></div>
-    <div class="op-cost-row"><span>Delta-V remaining</span><span id="op-budget"></span></div>
-    <div class="op-bar-wrap"><div id="op-bar-used"></div><div id="op-bar-cost"></div></div>
-  </div>
-
-  <div class="op-footer">
-    <button class="btn" id="op-execute">Execute burn</button>
-  </div>
-
   <div id="op-transfer-section">
-    <div class="op-soi-divider"></div>
     <div class="op-soi-header">
       <span class="op-soi-name">Interplanetary Transfer</span>
     </div>
-    <select id="op-transfer-target" style="width:100%;background:#0a0a14;border:1px solid #2a3a5a;color:#bbc;padding:3px 5px;font-family:monospace;font-size:11px;border-radius:3px;margin-bottom:6px;">
+    <select id="op-transfer-target" style="width:100%;background:#0a0a14;border:1px solid #2a3a5a;color:#bbc;padding:3px 5px;font-family:monospace;font-size:11px;border-radius:3px;margin:5px 0 6px;">
       <option value="">— select destination —</option>
     </select>
     <div id="op-transfer-info" style="display:none">
-      <div class="op-soi-row"><span>Transfer time</span><span id="op-xfer-time"></span></div>
-      <div class="op-soi-row"><span>Δv departure</span><span id="op-xfer-dv1"></span></div>
-      <div class="op-soi-row"><span>Δv arrival</span><span id="op-xfer-dv2"></span></div>
-      <div class="op-soi-row"><span>Total Δv</span><span id="op-xfer-dvtotal"></span></div>
-      <div class="op-soi-divider" style="margin:5px 0 4px"></div>
-      <div class="op-soi-row"><span>Phase: cur → need</span><span id="op-xfer-phase"></span></div>
       <div class="op-soi-row"><span>Launch window</span><span id="op-xfer-window"></span></div>
+      <div class="op-soi-row"><span>Transfer time</span><span id="op-xfer-time"></span></div>
       <div class="op-soi-row"><span>Launch cost</span><span id="op-xfer-cost"></span></div>
+      <div class="op-soi-row"><span>Total Δv</span><span id="op-xfer-dvtotal"></span></div>
+      <div class="op-soi-row" style="display:none"><span></span><span id="op-xfer-dv1"></span><span id="op-xfer-dv2"></span><span id="op-xfer-phase"></span></div>
+      <label class="xfer-auto-label" id="op-xfer-auto-wrap" style="margin-top:6px">
+        <input type="checkbox" id="op-xfer-auto">
+        <span id="op-xfer-auto-text">Auto-launch when window opens</span>
+      </label>
       <div style="display:flex;gap:5px;justify-content:flex-end;margin-top:6px;">
         <button class="btn" id="op-xfer-skip">▶▶ Skip to Window</button>
-        <button class="btn" id="op-xfer-execute" disabled style="opacity:0.35">Execute Transfer</button>
+        <button class="btn primary" id="op-xfer-execute" disabled>Launch Now</button>
       </div>
     </div>
   </div>
 
-  <div id="op-soi-section" style="display:none">
-    <div class="op-soi-divider"></div>
-    <div class="op-soi-header">
-      <span class="op-soi-name" id="op-soi-name">—</span>
-      <span class="op-soi-dist" id="op-soi-dist"></span>
-    </div>
-    <div class="op-soi-row"><span>Eccentricity</span><span id="op-soi-ecc"></span></div>
-    <div class="op-soi-row"><span>Periapsis alt.</span><span id="op-soi-per"></span></div>
-    <div class="op-soi-row" id="op-soi-apo-row"><span>Apoapsis alt.</span><span id="op-soi-apo"></span></div>
-    <div class="op-soi-row"><span>Capture Δv</span><span id="op-soi-capv"></span></div>
-    <div class="op-capture-wrap">
-      <button class="btn" id="op-capture">Capture at periapsis</button>
-    </div>
-  </div>
   </div><!-- /op-rocket-content -->
 
   <div id="op-colony-section" style="display:none">
@@ -362,10 +413,11 @@
     <div id="op-colony-established" style="display:none">
       <div id="op-colony-stats" style="display:grid;grid-template-columns:1fr 1fr;gap:3px 12px;padding:4px 0 6px;font-size:11px;font-family:monospace"></div>
     </div>
+    <div id="op-survey" style="display:none;margin-bottom:8px;padding:6px 8px;background:#0a0e18;border:1px solid #1e2c46;border-radius:3px"></div>
     <div id="op-colony-establish" style="display:none">
       <p style="color:#aab;font-size:11px;margin-bottom:8px">Consume this rocket to found a colonial outpost. Further supply runs will expand it.</p>
       <div style="display:flex;justify-content:flex-end">
-        <button class="btn" id="op-establish">Establish Colony</button>
+        <button class="btn primary" id="op-establish">Establish Colony</button>
       </div>
     </div>
   </div>
@@ -405,19 +457,23 @@
 
   <div id="op-army-section" style="display:none">
     <div class="op-soi-divider"></div>
-    <div class="op-soi-header">
+    <div class="op-soi-header collapsible" data-collapse="op-army-content">
       <span class="op-soi-name">Home Forces</span>
+      <span class="op-collapse-arrow">▸ show</span>
     </div>
-    <div id="op-army-content"></div>
+    <div id="op-army-content" style="display:none"></div>
   </div>
 
   <div id="op-orbitals-section" style="display:none">
     <div class="op-soi-divider"></div>
-    <div class="op-soi-header">
+    <div class="op-soi-header collapsible" data-collapse="op-orbitals-body">
       <span class="op-soi-name">Orbital Assets</span>
+      <span class="op-collapse-arrow">▸ show</span>
     </div>
-    <div id="op-orbitals-build" style="display:flex;gap:5px;margin-bottom:6px"></div>
-    <div id="op-orbitals-list" style="font-size:11px"></div>
+    <div id="op-orbitals-body" style="display:none">
+      <div id="op-orbitals-build" style="display:flex;gap:5px;margin-bottom:6px"></div>
+      <div id="op-orbitals-list" style="font-size:11px"></div>
+    </div>
   </div>
 
   <div id="op-mission-section" style="display:none">
@@ -438,6 +494,24 @@
 </div>
 
 <div id="launch-flash" style="display:none">TRANSFER WINDOW OPEN — LAUNCH NOW</div>
+
+<div id="toasts"></div>
+
+<div id="objectives" style="display:none">
+  <h4><span id="obj-title">Getting Started</span><span class="obj-min" id="obj-min" title="Collapse">−</span></h4>
+  <div id="obj-body"></div>
+</div>
+
+<div id="endgame" style="display:none">
+  <div id="eg-kicker"></div>
+  <div id="eg-title"></div>
+  <div id="eg-epilogue"></div>
+  <div id="eg-stats"></div>
+  <div id="eg-buttons">
+    <button class="btn" id="eg-continue">Keep Playing</button>
+    <button class="btn" id="eg-newgame">New System</button>
+  </div>
+</div>
 
 <div id="army-modal" style="display:none;position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:#111827;border:1px solid #334;padding:18px 20px;z-index:400;min-width:330px;max-width:460px;font-family:monospace">
   <div style="color:#ccd;font-size:12px;font-weight:bold;margin-bottom:4px;text-transform:uppercase;letter-spacing:1px">Deploy Army</div>
@@ -526,6 +600,133 @@ controls.maxDistance = 8000;
 
 const clock = new THREE.Clock();
 
+// ── Procedural audio (WebAudio, no assets) ────────────────
+const AudioSys = (() => {
+  let ctx = null, master = null, muted = false;
+
+  function ensure() {
+    if (!ctx) {
+      try { ctx = new (window.AudioContext || window.webkitAudioContext)(); }
+      catch { return null; }
+      master = ctx.createGain();
+      master.gain.value = muted ? 0 : 0.5;
+      master.connect(ctx.destination);
+      _startAmbient();
+    }
+    if (ctx.state === 'suspended') ctx.resume();
+    return ctx;
+  }
+
+  function _noiseBuffer(seconds) {
+    const len = Math.floor(ctx.sampleRate * seconds);
+    const buf = ctx.createBuffer(1, len, ctx.sampleRate);
+    const d = buf.getChannelData(0);
+    for (let i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
+    return buf;
+  }
+
+  function _startAmbient() {
+    // Deep space drone: two detuned sines + slow filtered noise wash
+    const g = ctx.createGain(); g.gain.value = 0.028; g.connect(master);
+    for (const f of [55, 55.6, 110.3]) {
+      const o = ctx.createOscillator(); o.type = 'sine'; o.frequency.value = f;
+      const og = ctx.createGain(); og.gain.value = f > 100 ? 0.25 : 1;
+      o.connect(og); og.connect(g); o.start();
+    }
+    const src = ctx.createBufferSource(); src.buffer = _noiseBuffer(4); src.loop = true;
+    const lp = ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 180; lp.Q.value = 0.4;
+    const ng = ctx.createGain(); ng.gain.value = 0.35;
+    src.connect(lp); lp.connect(ng); ng.connect(g); src.start();
+    const lfo = ctx.createOscillator(); lfo.frequency.value = 0.05;
+    const lfoG = ctx.createGain(); lfoG.gain.value = 0.012;
+    lfo.connect(lfoG); lfoG.connect(g.gain); lfo.start();
+  }
+
+  function _env(node, t0, peak, attack, decay) {
+    node.gain.setValueAtTime(0.0001, t0);
+    node.gain.exponentialRampToValueAtTime(peak, t0 + attack);
+    node.gain.exponentialRampToValueAtTime(0.0001, t0 + attack + decay);
+  }
+
+  function _tone(freq, { type = 'sine', peak = 0.12, attack = 0.01, decay = 0.18, glideTo = null, delay = 0 } = {}) {
+    if (!ensure()) return;
+    const t0 = ctx.currentTime + delay;
+    const o = ctx.createOscillator(); o.type = type;
+    o.frequency.setValueAtTime(freq, t0);
+    if (glideTo) o.frequency.exponentialRampToValueAtTime(glideTo, t0 + attack + decay);
+    const g = ctx.createGain(); _env(g, t0, peak, attack, decay);
+    o.connect(g); g.connect(master);
+    o.start(t0); o.stop(t0 + attack + decay + 0.05);
+  }
+
+  return {
+    init() { ensure(); },
+    toggleMute() {
+      muted = !muted;
+      if (master) master.gain.value = muted ? 0 : 0.5;
+      return muted;
+    },
+    get muted() { return muted; },
+    click()  { _tone(720, { type: 'square', peak: 0.04, decay: 0.06, glideTo: 420 }); },
+    launch() {
+      if (!ensure()) return;
+      const t0 = ctx.currentTime;
+      const src = ctx.createBufferSource(); src.buffer = _noiseBuffer(2.6);
+      const lp = ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.Q.value = 1.2;
+      lp.frequency.setValueAtTime(160, t0);
+      lp.frequency.exponentialRampToValueAtTime(1400, t0 + 0.7);
+      lp.frequency.exponentialRampToValueAtTime(90, t0 + 2.5);
+      const g = ctx.createGain(); _env(g, t0, 0.22, 0.25, 2.3);
+      src.connect(lp); lp.connect(g); g.connect(master);
+      src.start(t0);
+    },
+    explosion() {
+      if (!ensure()) return;
+      const t0 = ctx.currentTime;
+      const src = ctx.createBufferSource(); src.buffer = _noiseBuffer(1.4);
+      const lp = ctx.createBiquadFilter(); lp.type = 'lowpass';
+      lp.frequency.setValueAtTime(900, t0);
+      lp.frequency.exponentialRampToValueAtTime(70, t0 + 1.2);
+      const g = ctx.createGain(); _env(g, t0, 0.3, 0.012, 1.25);
+      src.connect(lp); lp.connect(g); g.connect(master);
+      src.start(t0);
+      _tone(80, { peak: 0.25, attack: 0.012, decay: 0.9, glideTo: 36 });
+    },
+    alarm() {
+      _tone(880, { type: 'triangle', peak: 0.07, decay: 0.12 });
+      _tone(880, { type: 'triangle', peak: 0.07, decay: 0.12, delay: 0.18 });
+    },
+    beam() {
+      _tone(1500, { type: 'sawtooth', peak: 0.07, attack: 0.02, decay: 0.55, glideTo: 110 });
+      _tone(750,  { type: 'square',   peak: 0.04, attack: 0.02, decay: 0.45, glideTo: 80, delay: 0.05 });
+    },
+    ping(severity) {
+      if (severity === 'good')        { _tone(660, { peak: 0.05, decay: 0.14 }); _tone(990, { peak: 0.05, decay: 0.2, delay: 0.09 }); }
+      else if (severity === 'danger') { _tone(220, { type: 'sawtooth', peak: 0.05, decay: 0.16 }); _tone(196, { type: 'sawtooth', peak: 0.05, decay: 0.24, delay: 0.16 }); }
+      else                            { _tone(440, { type: 'triangle', peak: 0.05, decay: 0.18 }); }
+    },
+    victory() {
+      [392, 523, 659, 784, 1046].forEach((f, i) =>
+        _tone(f, { peak: 0.1, decay: i === 4 ? 1.4 : 0.34, delay: i * 0.16 }));
+    },
+    defeat() {
+      [392, 370, 311, 233, 155].forEach((f, i) =>
+        _tone(f, { type: 'triangle', peak: 0.11, decay: i === 4 ? 1.8 : 0.42, delay: i * 0.24 }));
+    },
+  };
+})();
+
+// Wake audio on first interaction (browser autoplay policy), click feedback on buttons
+document.addEventListener('pointerdown', e => {
+  AudioSys.init();
+  if (e.target.closest('.btn, .act-fire, .log-tab, .op-close')) AudioSys.click();
+});
+document.getElementById('btn-mute').addEventListener('click', function () {
+  const m = AudioSys.toggleMute();
+  this.textContent = m ? '🔇' : '🔊';
+  this.classList.toggle('active', m);
+});
+
 // ── Seeded RNG (Mulberry32) ───────────────────────────────
 function makeRng(seed) {
   let s = seed >>> 0;
@@ -538,75 +739,6 @@ function makeRng(seed) {
 }
 function rr(rng, lo, hi) { return lo + rng() * (hi - lo); }
 function ri(rng, lo, hi) { return lo + Math.floor(rng() * (hi - lo + 1 - 1e-9)); }
-
-// ── Gas planet texture (from cities.obj) ─────────────────
-function _makePlanetTex(hue) {
-  const S = 256;
-  const c = document.createElement('canvas');
-  c.width = c.height = S;
-  const ctx = c.getContext('2d');
-  const col = (h, s, l, a = 1) => `hsla(${(h % 1) * 360},${s}%,${l}%,${a})`;
-  ctx.fillStyle = col(hue, 65, 42);
-  ctx.fillRect(0, 0, S, S);
-  const bands = 6 + Math.floor(Math.random() * 6);
-  for (let i = 0; i < bands; i++) {
-    const y = (i / bands) * S;
-    const bh = S / bands * (0.4 + Math.random() * 0.8);
-    const dh = (Math.random() - 0.5) * 0.15;
-    const dl = 30 + Math.random() * 40;
-    const grad = ctx.createLinearGradient(0, y, 0, y + bh);
-    grad.addColorStop(0,   col(hue + dh, 70, dl, 0));
-    grad.addColorStop(0.5, col(hue + dh, 70, dl, 0.85));
-    grad.addColorStop(1,   col(hue + dh, 70, dl, 0));
-    ctx.fillStyle = grad;
-    ctx.fillRect(0, y, S, bh);
-  }
-  const hBands = 3 + Math.floor(Math.random() * 4);
-  for (let i = 0; i < hBands; i++) {
-    const y = Math.random() * S;
-    const bh = 8 + Math.random() * 20;
-    const dh = 0.08 + Math.random() * 0.18;
-    const grad = ctx.createLinearGradient(0, y, 0, y + bh);
-    grad.addColorStop(0,   col(hue + dh, 80, 78, 0));
-    grad.addColorStop(0.5, col(hue + dh, 80, 78, 0.28));
-    grad.addColorStop(1,   col(hue + dh, 80, 78, 0));
-    ctx.fillStyle = grad;
-    ctx.fillRect(0, y, S, bh);
-  }
-  for (let y = 0; y < S; y += 3) {
-    const amp = 4 + Math.random() * 8;
-    const periods = 2 + Math.floor(Math.random() * 5);
-    const freq = periods / S;
-    ctx.beginPath();
-    for (let x = 0; x <= S; x++) {
-      const yy = y + Math.sin(x * freq * Math.PI * 2) * amp;
-      x === 0 ? ctx.moveTo(x, yy) : ctx.lineTo(x, yy);
-    }
-    ctx.strokeStyle = col(hue + (Math.random() - 0.5) * 0.1, 60, 55 + Math.random() * 20, 0.32);
-    ctx.lineWidth = 1.5;
-    ctx.stroke();
-  }
-  const cloudRows = 18 + Math.floor(Math.random() * 12);
-  for (let i = 0; i < cloudRows; i++) {
-    const cy = Math.random() * S;
-    const blobs = 6 + Math.floor(Math.random() * 10);
-    for (let j = 0; j < blobs; j++) {
-      const cx = Math.random() * S;
-      const r  = 3 + Math.random() * 9;
-      const g  = ctx.createRadialGradient(cx, cy, 0, cx, cy, r);
-      g.addColorStop(0, `rgba(255,255,255,${0.06 + Math.random() * 0.10})`);
-      g.addColorStop(1, 'rgba(255,255,255,0)');
-      ctx.fillStyle = g;
-      ctx.fillRect(cx - r, cy - r, r * 2, r * 2);
-    }
-  }
-  const pg = ctx.createRadialGradient(S / 2, 4, 0, S / 2, 4, S * 0.38);
-  pg.addColorStop(0, 'rgba(255,255,255,0.55)');
-  pg.addColorStop(1, 'rgba(255,255,255,0)');
-  ctx.fillStyle = pg;
-  ctx.fillRect(0, 0, S, S);
-  return new THREE.CanvasTexture(c);
-}
 
 // ── Gas planet v2 — pixel-band + storm ovals ─────────────
 // Palette presets: each gives a distinct gas-giant personality
@@ -872,6 +1004,94 @@ function _makeRockyTex(hue, seed, type = 'rock') {
   return { map: new THREE.CanvasTexture(dc), normalMap: new THREE.CanvasTexture(nc), emissiveMap };
 }
 
+// ── Cloud layer texture (transparent canvas, soft streaked blobs) ────────────
+function _makeCloudTex(seed, tint = [255, 255, 255]) {
+  const S = 256;
+  const c = document.createElement('canvas'); c.width = c.height = S;
+  const ctx = c.getContext('2d');
+  let _s = seed | 0;
+  const r = () => { _s = (_s * 1664525 + 1013904223) & 0xffffffff; return (_s >>> 0) / 0xffffffff; };
+  const [tr, tg, tb] = tint;
+  // banded cloud belts with elongated soft blobs
+  const belts = 5 + Math.floor(r() * 4);
+  for (let b = 0; b < belts; b++) {
+    const cy = (b + 0.5) / belts * S + (r() - 0.5) * 18;
+    const blobs = 10 + Math.floor(r() * 14);
+    for (let i = 0; i < blobs; i++) {
+      const cx = r() * S;
+      const w = 14 + r() * 42, h = 5 + r() * 11;
+      const a = 0.10 + r() * 0.16;
+      ctx.save();
+      ctx.translate(cx, cy + (r() - 0.5) * 14);
+      ctx.scale(1, h / w);
+      const g = ctx.createRadialGradient(0, 0, 0, 0, 0, w);
+      g.addColorStop(0, `rgba(${tr},${tg},${tb},${a})`);
+      g.addColorStop(1, 'rgba(0,0,0,0)');
+      ctx.fillStyle = g;
+      ctx.beginPath(); ctx.arc(0, 0, w, 0, Math.PI * 2); ctx.fill();
+      ctx.restore();
+      // wrap horizontally so the seam is hidden
+      if (cx + w > S) {
+        ctx.save();
+        ctx.translate(cx - S, cy);
+        ctx.scale(1, h / w);
+        ctx.fillStyle = g;
+        ctx.beginPath(); ctx.arc(0, 0, w, 0, Math.PI * 2); ctx.fill();
+        ctx.restore();
+      }
+    }
+  }
+  // a few bright storm cells
+  for (let i = 0; i < 6; i++) {
+    const cx = r() * S, cy = r() * S, rad = 6 + r() * 14;
+    const g = ctx.createRadialGradient(cx, cy, 0, cx, cy, rad);
+    g.addColorStop(0, `rgba(${tr},${tg},${tb},${0.28 + r() * 0.18})`);
+    g.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.fillStyle = g;
+    ctx.beginPath(); ctx.arc(cx, cy, rad, 0, Math.PI * 2); ctx.fill();
+  }
+  return new THREE.CanvasTexture(c);
+}
+
+// ── Gas giant shimmer layer (translucent latitude bands + storm cells) ───────
+// Rendered just above the surface and rotated at a different rate, the two
+// patterns slide across each other — visible atmospheric churn.
+function _makeGasOverlayTex(seed) {
+  const S = 256;
+  const c = document.createElement('canvas'); c.width = c.height = S;
+  const ctx = c.getContext('2d');
+  let _s = seed | 0;
+  const r = () => { _s = (_s * 1664525 + 1013904223) & 0xffffffff; return (_s >>> 0) / 0xffffffff; };
+  const f1 = 0.05 + r() * 0.05, p1 = r() * Math.PI * 2;
+  const f2 = 0.012 + r() * 0.02, p2 = r() * Math.PI * 2;
+  const img = ctx.createImageData(S, S);
+  for (let y = 0; y < S; y++) {
+    const band = Math.sin(y * f1 + p1) * 0.55 + Math.sin(y * f2 + p2) * 0.45;
+    const a = Math.max(0, band) * 0.5;                    // many rows fully transparent
+    for (let x = 0; x < S; x++) {
+      const i = (y * S + x) * 4;
+      const jitter = 0.75 + r() * 0.25;
+      img.data[i] = 255; img.data[i+1] = 248; img.data[i+2] = 232;
+      img.data[i+3] = a * jitter * 255;
+    }
+  }
+  ctx.putImageData(img, 0, 0);
+  // bright storm cells riding in the band layer
+  const cells = 3 + Math.floor(r() * 4);
+  for (let i = 0; i < cells; i++) {
+    const cx = r() * S, cy = r() * S, w = 12 + r() * 26, h = w * (0.3 + r() * 0.3);
+    ctx.save();
+    ctx.translate(cx, cy); ctx.scale(1, h / w);
+    const g = ctx.createRadialGradient(0, 0, 0, 0, 0, w);
+    g.addColorStop(0, `rgba(255,255,245,${0.4 + r() * 0.3})`);
+    g.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.fillStyle = g;
+    ctx.beginPath(); ctx.arc(0, 0, w, 0, Math.PI * 2); ctx.fill();
+    ctx.restore();
+  }
+  return new THREE.CanvasTexture(c);
+}
+
 // ── Planet type catalog ───────────────────────────────────
 const PLANET_CATALOG = [
   {
@@ -879,8 +1099,7 @@ const PLANET_CATALOG = [
     radiusRange: [14, 36], shininess: 20, dotColor: '#d4a050',
     ringChance: 0.40, doomedMoonChance: 0.55, moonChance: 0.50, moonCountRange: [1, 3],
     makeTex(rng) {
-      const h = 0.12 + rng() * 0.53;
-      return { map: _makePlanetTex(h), color: new THREE.Color().setHSL(h, 0.75, 0.58) };
+      return { map: _makeGasTex(rng() * 99999), color: new THREE.Color(0.95, 0.9, 0.85) };
     },
   },
   {
@@ -888,7 +1107,7 @@ const PLANET_CATALOG = [
     radiusRange: [14, 36], shininess: 22, dotColor: '#c09040',
     ringChance: 0.40, doomedMoonChance: 0.55, moonChance: 0.50, moonCountRange: [1, 3],
     makeTex(rng) {
-      return { map: _makeGasTex(rng() * 99999), color: new THREE.Color(0.7, 0.55, 0.35) };
+      return { map: _makeGasTex(rng() * 99999), color: new THREE.Color(0.82, 0.72, 0.6) };
     },
   },
   {
@@ -967,6 +1186,50 @@ const PLANET_CATALOG = [
   },
 ];
 
+// ── Colony survey traits (keyed by planet type id) ────────
+// mult       — income multiplier for all colony revenue
+// growth     — population growth interval multiplier (<1 = faster growth)
+// bias       — random-event weight multipliers (hazards & opportunities)
+// blurb/risk — survey text shown before establishing
+const COLONY_TRAITS = {
+  rock: {
+    mult: 1.0, blurb: 'Stable silicate crust. Textbook colony site.',
+    risk: 'No notable hazards', bias: {},
+  },
+  black: {
+    mult: 1.15, blurb: 'Obsidian crust laced with exotic minerals. Survey returns are… strange.',
+    risk: 'Anomalous geology', bias: { ancient_civilization_discovered: 2.5, alien_warning_decoded: 1.5 },
+  },
+  water: {
+    mult: 0.85, growth: 0.6, blurb: 'Open water and a breathable-adjacent sky. Settlers will put down roots.',
+    risk: 'Low mineral yield', bias: { disease_outbreak: 0.7, first_human_child_born: 2.0, miner_community_forms: 2.0 },
+  },
+  ocean: {
+    mult: 0.8, growth: 0.55, blurb: 'A world-ocean dotted with archipelagos. Families will follow the work.',
+    risk: 'Low mineral yield', bias: { disease_outbreak: 0.7, first_human_child_born: 2.2, miner_community_forms: 2.2, alien_bacteria_discovered: 1.8 },
+  },
+  ice: {
+    mult: 0.95, blurb: 'Cryogenic extraction beneath kilometre-deep glaciers. Slow, clean, quiet.',
+    risk: 'Preserved subsurface anomalies', bias: { disease_outbreak: 0.6, ancient_civilization_discovered: 1.6 },
+  },
+  desert: {
+    mult: 1.2, blurb: 'Wind-scoured dunes over rich surface deposits. Easy digging.',
+    risk: 'Buried structures detected', bias: { resource_vein_discovered: 1.6, ancient_civilization_discovered: 2.0 },
+  },
+  lava: {
+    mult: 1.5, blurb: 'Volcanic riches — rare metals bleed straight out of the crust.',
+    risk: 'SEVERE: seismic & thermal hazard', bias: { mining_accident: 2.2, nuclear_meltdown: 1.6, resource_vein_discovered: 2.0 },
+  },
+  toxic: {
+    mult: 1.35, blurb: 'The atmosphere is poison and the soil is worth a fortune.',
+    risk: 'SEVERE: biohazard exposure', bias: { disease_outbreak: 2.2, alien_bacteria_discovered: 2.5, alien_contamination: 1.6 },
+  },
+  gas: {
+    mult: 0, blurb: 'No solid surface. Colonization impossible.',
+    risk: '—', bias: {},
+  },
+};
+
 function zoneWeight(e, t) {
   if (e.midWeight !== undefined) {
     return t < 0.5
@@ -994,25 +1257,78 @@ const STAR_TYPES = [
   { name: 'F-type', inner: '#ffffff', mid: '#ffffcc', outer: '#ffcc55', light: 0xffee88 },
 ];
 
-function makeStarTexture(rng) {
-  const size = 512;
-  const canvas = document.createElement('canvas');
-  canvas.width = canvas.height = size;
-  const ctx = canvas.getContext('2d');
-  const cx = size / 2;
-  const st = STAR_TYPES[ri(rng, 0, STAR_TYPES.length - 1)];
-  const g = ctx.createRadialGradient(cx, cx, 0, cx, cx, cx);
-  g.addColorStop(0,    st.inner);
-  g.addColorStop(0.25, st.mid);
-  g.addColorStop(0.65, st.outer);
-  g.addColorStop(1,    'transparent');
-  ctx.fillStyle = g; ctx.fillRect(0, 0, size, size);
-  for (let i = 0; i < 180; i++) {
-    const px = rng() * size, py = rng() * size, pr = 2 + rng() * 8;
-    ctx.fillStyle = `rgba(255,255,255,${0.04 + rng() * 0.08})`;
-    ctx.beginPath(); ctx.arc(px, py, pr, 0, Math.PI * 2); ctx.fill();
+// Equirectangular plasma surface — wraps seamlessly on a sphere (the old radial
+// disk texture bunched at one UV point and left black gaps at the corners).
+function makeStarSurfaceTex(rng, st) {
+  const S = 256;
+  let _s = (rng() * 0xffffffff) | 0;
+  function hash3(ix, iy, iz) {
+    let h = (ix * 374761393 ^ iy * 668265263 ^ iz * 1013904223) + ((_s * 982451653) | 0);
+    h = ((h ^ (h >>> 13)) * 1274126177) | 0;
+    return ((h >>> 0) & 0x7fffffff) / 0x7fffffff;
   }
-  return { texture: new THREE.CanvasTexture(canvas), type: st };
+  function noise3(x, y, z) {
+    const xi = Math.floor(x), yi = Math.floor(y), zi = Math.floor(z);
+    const fx = x-xi, fy = y-yi, fz = z-zi;
+    const ux = fx*fx*(3-2*fx), uy = fy*fy*(3-2*fy), uz = fz*fz*(3-2*fz);
+    const v000=hash3(xi,yi,zi), v100=hash3(xi+1,yi,zi), v010=hash3(xi,yi+1,zi), v110=hash3(xi+1,yi+1,zi);
+    const v001=hash3(xi,yi,zi+1), v101=hash3(xi+1,yi,zi+1), v011=hash3(xi,yi+1,zi+1), v111=hash3(xi+1,yi+1,zi+1);
+    return v000*(1-ux)*(1-uy)*(1-uz)+v100*ux*(1-uy)*(1-uz)+v010*(1-ux)*uy*(1-uz)+v110*ux*uy*(1-uz)
+          +v001*(1-ux)*(1-uy)*uz+v101*ux*(1-uy)*uz+v011*(1-ux)*uy*uz+v111*ux*uy*uz;
+  }
+  // x maps around a circle so the left/right texture edges meet perfectly
+  function makeFbm(scale, octaves) {
+    const r = scale / (Math.PI * 2);
+    const sz = scale * 0.8;
+    return (px, py) => {
+      const cx = Math.cos(px * Math.PI * 2) * r;
+      const cy = Math.sin(px * Math.PI * 2) * r;
+      const cz = py * sz;
+      let v = 0, amp = 0.5, freq = 1, max = 0;
+      for (let o = 0; o < octaves; o++) {
+        v += noise3(cx*freq, cy*freq, cz*freq) * amp;
+        max += amp; amp *= 0.5; freq *= 2.1;
+      }
+      return v / max;
+    };
+  }
+  const fbmLo  = makeFbm(5 + rng() * 3, 5);    // large convection structure
+  const fbmHi  = makeFbm(26, 3);               // fine granulation
+  const fbmSpt = makeFbm(9, 3);                // sunspot field
+
+  const cInner = new THREE.Color(st.inner);
+  const cMid   = new THREE.Color(st.mid);
+  const cOuter = new THREE.Color(st.outer);
+  const cDeep  = cOuter.clone().multiplyScalar(0.42);
+  const lerp3 = (a, b, t) => [a.r + (b.r - a.r) * t, a.g + (b.g - a.g) * t, a.b + (b.b - a.b) * t];
+
+  const c = document.createElement('canvas'); c.width = c.height = S;
+  const ctx = c.getContext('2d');
+  const img = ctx.createImageData(S, S);
+  for (let y = 0; y < S; y++) for (let x = 0; x < S; x++) {
+    const u = x / S, v = y / S;
+    const lo = fbmLo(u, v), hi = fbmHi(u, v);
+    const t = Math.min(1, Math.max(0, lo * 0.85 + hi * 0.5 - 0.18));
+    let rr, gg, bb;
+    if      (t < 0.45) { [rr, gg, bb] = lerp3(cDeep, cOuter, t / 0.45); }
+    else if (t < 0.80) { [rr, gg, bb] = lerp3(cOuter, cMid, (t - 0.45) / 0.35); }
+    else               { [rr, gg, bb] = lerp3(cMid, cInner, (t - 0.80) / 0.20); }
+    // sunspots: dark umbra with soft penumbra where the spot field peaks
+    const sp = fbmSpt(u, v);
+    if (sp > 0.68) {
+      const dim = 1 - Math.min(1, (sp - 0.68) / 0.18) * 0.8;
+      rr *= dim; gg *= dim * 0.92; bb *= dim * 0.85;
+    }
+    const i = (y * S + x) * 4;
+    img.data[i]   = Math.min(255, rr * 255);
+    img.data[i+1] = Math.min(255, gg * 255);
+    img.data[i+2] = Math.min(255, bb * 255);
+    img.data[i+3] = 255;
+  }
+  ctx.putImageData(img, 0, 0);
+  const tex = new THREE.CanvasTexture(c);
+  tex.wrapS = THREE.RepeatWrapping;
+  return tex;
 }
 
 // ── Starfield (background) ────────────────────────────────
@@ -1037,6 +1353,78 @@ function buildStarfield() {
   return new THREE.Points(geo, new THREE.PointsMaterial({ size: 1.8, vertexColors: true, sizeAttenuation: false }));
 }
 
+// ── Nebula backdrop (soft canvas-cloud sprites at infinity) ──
+function buildNebula() {
+  const group = new THREE.Group();
+  const NEB_COLS = [
+    [[80, 40, 160], [200, 60, 120]],   // violet / magenta
+    [[30, 80, 160], [60, 180, 200]],   // deep blue / teal
+    [[160, 60, 40], [200, 140, 60]],   // ember / amber
+  ];
+  for (let n = 0; n < 3; n++) {
+    const S = 512;
+    const c = document.createElement('canvas'); c.width = c.height = S;
+    const ctx = c.getContext('2d');
+    const [colA, colB] = NEB_COLS[n];
+    const blobs = 26 + Math.floor(Math.random() * 18);
+    for (let i = 0; i < blobs; i++) {
+      // cluster blobs toward canvas centre for a coherent cloud
+      const cx = S/2 + (Math.random() + Math.random() - 1) * S * 0.3;
+      const cy = S/2 + (Math.random() + Math.random() - 1) * S * 0.3;
+      const r  = 30 + Math.random() * 120;
+      const t  = Math.random();
+      const col = colA.map((v, k) => Math.round(v + (colB[k] - v) * t));
+      const g = ctx.createRadialGradient(cx, cy, 0, cx, cy, r);
+      g.addColorStop(0, `rgba(${col[0]},${col[1]},${col[2]},${0.05 + Math.random() * 0.07})`);
+      g.addColorStop(1, 'rgba(0,0,0,0)');
+      ctx.fillStyle = g;
+      ctx.fillRect(cx - r, cy - r, r * 2, r * 2);
+    }
+    // pinprick stars inside the cloud
+    for (let i = 0; i < 40; i++) {
+      ctx.fillStyle = `rgba(255,255,255,${0.2 + Math.random() * 0.5})`;
+      ctx.fillRect(Math.random() * S, Math.random() * S, 1.2, 1.2);
+    }
+    const sprite = new THREE.Sprite(new THREE.SpriteMaterial({
+      map: new THREE.CanvasTexture(c), transparent: true, opacity: 0.85,
+      depthWrite: false, blending: THREE.AdditiveBlending,
+    }));
+    const theta = Math.random() * Math.PI * 2;
+    const phi   = Math.acos(2 * Math.random() - 1);
+    const dist  = 10500;
+    sprite.position.set(
+      dist * Math.sin(phi) * Math.cos(theta),
+      dist * Math.cos(phi) * 0.6,
+      dist * Math.sin(phi) * Math.sin(theta),
+    );
+    const sc = 5200 + Math.random() * 4200;
+    sprite.scale.set(sc, sc, 1);
+    group.add(sprite);
+  }
+  return group;
+}
+
+// ── Star glow sprite (cheap bloom) ────────────────────────
+function buildStarGlow(starRadius, lightColor) {
+  const S = 256;
+  const c = document.createElement('canvas'); c.width = c.height = S;
+  const ctx = c.getContext('2d');
+  const col = new THREE.Color(lightColor);
+  const r255 = v => Math.round(v * 255);
+  const g = ctx.createRadialGradient(S/2, S/2, 0, S/2, S/2, S/2);
+  g.addColorStop(0,    `rgba(255,255,255,0.9)`);
+  g.addColorStop(0.18, `rgba(${r255(col.r)},${r255(col.g)},${r255(col.b)},0.5)`);
+  g.addColorStop(0.5,  `rgba(${r255(col.r)},${r255(col.g)},${r255(col.b)},0.13)`);
+  g.addColorStop(1,    'rgba(0,0,0,0)');
+  ctx.fillStyle = g; ctx.fillRect(0, 0, S, S);
+  const sprite = new THREE.Sprite(new THREE.SpriteMaterial({
+    map: new THREE.CanvasTexture(c), transparent: true,
+    depthWrite: false, blending: THREE.AdditiveBlending,
+  }));
+  sprite.scale.setScalar(starRadius * 9);
+  return sprite;
+}
+
 // ── Orbit Ring ────────────────────────────────────────────
 function buildOrbitRing(r) {
   const N = 160;
@@ -1051,37 +1439,59 @@ function buildOrbitRing(r) {
 
 // ── Rocket mesh ───────────────────────────────────────────
 function buildRocketMesh(s) {
-  const g   = new THREE.Group();
-  const wht = new THREE.MeshPhongMaterial({ color: 0xdde0ee, shininess: 70 });
-  const gry = new THREE.MeshPhongMaterial({ color: 0x8899aa, shininess: 90 });
-  const red = new THREE.MeshPhongMaterial({ color: 0xcc2222 });
+  const g    = new THREE.Group();
+  const wht  = new THREE.MeshPhongMaterial({ color: 0xe9edf7, shininess: 85 });
+  const acc  = new THREE.MeshPhongMaterial({ color: 0xff7733, shininess: 45 });
+  const gry  = new THREE.MeshPhongMaterial({ color: 0x6a7686, shininess: 90 });
+  const dark = new THREE.MeshPhongMaterial({ color: 0x2c323c, shininess: 35 });
 
-  const body = new THREE.Mesh(new THREE.CylinderGeometry(s*0.12, s*0.14, s*0.65, 8), wht);
+  // main stage with a painted accent band
+  const body = new THREE.Mesh(new THREE.CylinderGeometry(s*0.115, s*0.135, s*0.55, 10), wht);
+  body.position.y = -s * 0.05;
   g.add(body);
+  const band = new THREE.Mesh(new THREE.CylinderGeometry(s*0.118, s*0.121, s*0.07, 10), acc);
+  band.position.y = s * 0.06;
+  g.add(band);
 
-  const nose = new THREE.Mesh(new THREE.ConeGeometry(s*0.12, s*0.32, 8), wht);
-  nose.position.y = s * 0.485;
+  // tapered upper stage + nose
+  const upper = new THREE.Mesh(new THREE.CylinderGeometry(s*0.075, s*0.115, s*0.16, 10), wht);
+  upper.position.y = s * 0.305;
+  g.add(upper);
+  const nose = new THREE.Mesh(new THREE.ConeGeometry(s*0.075, s*0.24, 10), acc);
+  nose.position.y = s * 0.505;
   g.add(nose);
 
-  const bell = new THREE.Mesh(new THREE.CylinderGeometry(s*0.19, s*0.13, s*0.14, 8), gry);
-  bell.position.y = -s * 0.395;
+  // engine: dark bell with grey throat
+  const throat = new THREE.Mesh(new THREE.CylinderGeometry(s*0.07, s*0.09, s*0.07, 8), gry);
+  throat.position.y = -s * 0.355;
+  g.add(throat);
+  const bell = new THREE.Mesh(new THREE.CylinderGeometry(s*0.09, s*0.17, s*0.13, 8, 1, true), dark);
+  bell.position.y = -s * 0.45;
   g.add(bell);
 
-  for (let i = 0; i < 3; i++) {
-    const fin = new THREE.Mesh(new THREE.BoxGeometry(s*0.04, s*0.22, s*0.17), red);
-    const a = (i / 3) * Math.PI * 2;
-    fin.position.set(Math.cos(a) * s*0.12, -s*0.28, Math.sin(a) * s*0.12);
-    fin.rotation.y = a;
+  // four swept fins
+  for (let i = 0; i < 4; i++) {
+    const fin = new THREE.Mesh(new THREE.BoxGeometry(s*0.028, s*0.24, s*0.15), acc);
+    const a = (i / 4) * Math.PI * 2;
+    fin.position.set(Math.cos(a) * s*0.15, -s*0.26, Math.sin(a) * s*0.15);
+    fin.rotation.y = -a;
+    fin.rotation.x = 0.18;   // swept back
     g.add(fin);
   }
 
-  const glow = new THREE.Mesh(
-    new THREE.SphereGeometry(s*0.10, 6, 6),
-    new THREE.MeshBasicMaterial({ color: 0xff6600, transparent: true, opacity: 0.85,
-      blending: THREE.AdditiveBlending, depthWrite: false }),
-  );
+  // idle engine glow (flickers) and nav beacon on the nose (pulses)
+  const engineMat = new THREE.MeshBasicMaterial({ color: 0xff7722, transparent: true, opacity: 0.7,
+    blending: THREE.AdditiveBlending, depthWrite: false });
+  const glow = new THREE.Mesh(new THREE.SphereGeometry(s*0.10, 6, 6), engineMat);
   glow.position.y = -s * 0.51;
   g.add(glow);
+  const beaconMat = new THREE.MeshBasicMaterial({ color: 0xff3344, transparent: true, opacity: 0.9,
+    blending: THREE.AdditiveBlending, depthWrite: false });
+  const beacon = new THREE.Mesh(new THREE.SphereGeometry(s*0.035, 6, 6), beaconMat);
+  beacon.position.y = s * 0.64;
+  g.add(beacon);
+  g.userData.beaconMat = beaconMat;
+  g.userData.engineMat = engineMat;
 
   return g;
 }
@@ -1102,15 +1512,48 @@ function buildEllipticalOrbitRing(a, e) {
   );
 }
 
-// ── Saturn-style Rings ────────────────────────────────────
+// ── Saturn-style Rings (banded canvas texture, planar-mapped) ────────────────
 function buildPlanetRings(rng, planetRadius) {
   const inner = planetRadius * (1.35 + rng() * 0.3);
   const outer = inner + planetRadius * (0.5 + rng() * 0.9);
-  const geo = new THREE.RingGeometry(inner, outer, 80);
-  const r = 0.5 + rng() * 0.4, g = 0.4 + rng() * 0.3, b = 0.2 + rng() * 0.2;
+
+  // base hue family for this ring system
+  const br = 140 + rng() * 90, bg = 110 + rng() * 70, bb = 70 + rng() * 60;
+  const S = 256, mid = S / 2;
+  const c = document.createElement('canvas'); c.width = c.height = S;
+  const ctx = c.getContext('2d');
+  // RingGeometry UVs are planar over [-outer, outer] → concentric canvas bands
+  // land exactly on geometry radii. Build dense bands with Cassini-like gaps.
+  let frac = inner / outer;
+  while (frac < 1.0) {
+    const bandW = 0.012 + rng() * 0.05;            // band width as outer-radius fraction
+    const gap   = rng() < 0.18 ? 0.01 + rng() * 0.03 : 0;
+    const tone  = 0.55 + rng() * 0.6;
+    const alpha = 0.25 + rng() * 0.55;
+    const r0 = frac * mid, r1 = Math.min(1, frac + bandW) * mid;
+    ctx.strokeStyle = `rgba(${Math.min(255, br * tone) | 0},${Math.min(255, bg * tone) | 0},${Math.min(255, bb * tone) | 0},${alpha})`;
+    ctx.lineWidth = Math.max(1, r1 - r0);
+    ctx.beginPath();
+    ctx.arc(mid, mid, (r0 + r1) / 2, 0, Math.PI * 2);
+    ctx.stroke();
+    frac += bandW + gap;
+  }
+  // soft fade at the inner and outer edges
+  const fadeGrad = ctx.createRadialGradient(mid, mid, mid * (inner / outer), mid, mid, mid);
+  fadeGrad.addColorStop(0, 'rgba(0,0,0,0.55)');
+  fadeGrad.addColorStop(0.12, 'rgba(0,0,0,0)');
+  fadeGrad.addColorStop(0.92, 'rgba(0,0,0,0)');
+  fadeGrad.addColorStop(1, 'rgba(0,0,0,0.8)');
+  ctx.globalCompositeOperation = 'destination-out';
+  ctx.fillStyle = fadeGrad;
+  ctx.fillRect(0, 0, S, S);
+  ctx.globalCompositeOperation = 'source-over';
+
+  const geo = new THREE.RingGeometry(inner, outer, 96);
   const mat = new THREE.MeshBasicMaterial({
-    color: new THREE.Color(r, g, b),
-    side: THREE.DoubleSide, transparent: true, opacity: 0.5 + rng() * 0.25,
+    map: new THREE.CanvasTexture(c),
+    side: THREE.DoubleSide, transparent: true, depthWrite: false,
+    opacity: 0.85,
   });
   const ring = new THREE.Mesh(geo, mat);
   ring.rotation.x = Math.PI * (0.35 + rng() * 0.3);
@@ -1307,6 +1750,17 @@ let colonies      = [];     // [{planet, world, playerCooldowns, nextEventTick}]
 let activeColony  = null;   // colony whose panel is currently open
 let _simTimeAccum = 0;
 let _logVisible   = false;
+let _gameOver        = false;
+let _endgameSandbox  = false;   // player chose "keep playing" — stop end-condition checks
+let _takeoverCounter = 0;
+let _objVisible   = true;
+let _objCollapsed = false;
+let _lastFundsShown = null;
+const _tut = { transferred: false };
+let _starMesh   = null;   // spinning star sphere, set by generateSystem
+let _starRadius = 0;
+let _nextMiniFlare = 0;   // performance.now() ms — ambient prominence schedule
+const _fxList = [];       // active event visual effects: { update(rawDt)→bool, cleanup() }
 const _factionCollapsed = {};   // key → true when section is collapsed
 let _showControlOverlay = false;
 let orbitals = [];   // [{id, type, planet, buildDoneAt, mesh, angle}]
@@ -1358,6 +1812,7 @@ let _windowSavedSpeedIdx = null; // speed saved when first window opened
 let _openWindowCount     = 0;    // how many windows (narrative + orbital) are currently open
 let _orbitWindowWasOpen   = false;
 let _missionWindowWasOpen = false;
+let _autoLaunchArmed      = false;   // manual transfer fires automatically at alignment
 
 function _onWindowOpen() {
   _openWindowCount++;
@@ -1367,6 +1822,7 @@ function _onWindowOpen() {
     if (simSpeedIdx > TARGET) { simSpeedIdx = TARGET; simSpeed = SIM_SPEEDS[TARGET]; updateSpeedUI(); }
   }
   document.getElementById('launch-flash').style.display = '';
+  AudioSys.alarm();
 }
 function _onWindowClose() {
   _openWindowCount = Math.max(0, _openWindowCount - 1);
@@ -1391,7 +1847,8 @@ function spawnPlanet(typeDef, rng, orbitR, name, zoneT = 0.5) {
   const radius      = rr(rng, typeDef.radiusRange[0], typeDef.radiusRange[1]);
   const inclination = (rng() - 0.5) * 0.38;
   const startAngle  = rng() * Math.PI * 2;
-  const selfSpin    = (rng() - 0.45) * 0.25;
+  // gas giants rotate fast (Jupiter's day is 10h) — makes the bands visibly churn
+  const selfSpin    = (rng() - 0.45) * 0.25 * (typeDef.id === 'gas' ? 2.4 : 1);
   const speed       = (0.06 / Math.sqrt(orbitR / 50)) * (0.7 + rng() * 0.6);
 
   const { map, normalMap, emissiveMap, color } = typeDef.makeTex(rng);
@@ -1413,7 +1870,32 @@ function spawnPlanet(typeDef, rng, orbitR, name, zoneT = 0.5) {
   tiltGroup.add(planetNode);
 
   const mesh = new THREE.Mesh(new THREE.SphereGeometry(radius, 36, 36), new THREE.MeshPhongMaterial(matProps));
+  if (typeDef.id === 'gas') mesh.scale.y = 0.93;   // gas giants are visibly oblate
   planetNode.add(mesh);
+
+  // drifting cloud deck on wet and toxic worlds; drifting band layer on gas giants
+  let cloudMesh = null;
+  if (typeDef.id === 'water' || typeDef.id === 'ocean' || typeDef.id === 'toxic') {
+    const tint = typeDef.id === 'toxic' ? [190, 230, 120] : [255, 255, 255];
+    cloudMesh = new THREE.Mesh(
+      new THREE.SphereGeometry(radius * 1.035, 28, 28),
+      new THREE.MeshPhongMaterial({
+        map: _makeCloudTex(rng() * 99999, tint),
+        transparent: true, depthWrite: false, shininess: 4,
+      }),
+    );
+    planetNode.add(cloudMesh);
+  } else if (typeDef.id === 'gas') {
+    cloudMesh = new THREE.Mesh(
+      new THREE.SphereGeometry(radius * 1.012, 32, 32),
+      new THREE.MeshPhongMaterial({
+        map: _makeGasOverlayTex(rng() * 99999),
+        transparent: true, opacity: 0.7, depthWrite: false, shininess: 8,
+      }),
+    );
+    cloudMesh.scale.y = 0.93;   // match the oblate body
+    planetNode.add(cloudMesh);
+  }
 
   if (typeDef.atmColor) {
     planetNode.add(new THREE.Mesh(
@@ -1465,12 +1947,14 @@ function spawnPlanet(typeDef, rng, orbitR, name, zoneT = 0.5) {
 
   const rocket = null;
 
-  return { mesh, planetNode, tiltGroup, orbitR, speed, angle: startAngle, selfSpin,
-           moons, doomedMoon, orbitRing, rocket, name,
+  const planet = { mesh, planetNode, tiltGroup, orbitR, speed, angle: startAngle, selfSpin,
+           moons, doomedMoon, orbitRing, rocket, name, cloudMesh,
            type: typeDef.id, label: typeDef.label, dotColor: typeDef.dotColor, radius,
            soiRadius: radius * 6,
            GM: radius * radius * radius * 0.5,
            sidebarEntry: null };
+  if (typeDef.id === 'lava') planet._lavaPhase = rng() * Math.PI * 2;   // emissive flicker
+  return planet;
 }
 
 // ── Rocket factory (used for home planet) ─────────────────
@@ -1540,6 +2024,13 @@ function generateSystem(seed, planetCount) {
   document.getElementById('launch-flash').style.display = 'none';
   scheduledMissions.length = 0;
   _flightStates = [];
+  _gameOver = false; _endgameSandbox = false; _takeoverCounter = 0;
+  _tut.transferred = false;
+  for (const fx of _fxList) fx.cleanup?.();
+  _fxList.length = 0;
+  _starMesh = null; _starRadius = 0;
+  document.getElementById('endgame').style.display = 'none';
+  document.getElementById('toasts').innerHTML = '';
   updateFundsDisplay();
   hideColonyControls();
 
@@ -1548,16 +2039,32 @@ function generateSystem(seed, planetCount) {
   scene.add(systemGroup);
 
   const starRadius = 10 + rng() * 14;
-  const { texture: starTex, type: st } = makeStarTexture(rng);
+  const st = STAR_TYPES[ri(rng, 0, STAR_TYPES.length - 1)];
 
   const starMesh = new THREE.Mesh(
     new THREE.SphereGeometry(starRadius * 1.6, 40, 40),
-    new THREE.MeshBasicMaterial({ map: starTex }),
+    new THREE.MeshBasicMaterial({ map: makeStarSurfaceTex(rng, st) }),
   );
   systemGroup.add(starMesh);
+  _starMesh = starMesh;
+  _starRadius = starRadius;
+
+  // second churn layer counter-rotating on a tilted axis — the two plasma
+  // patterns slide across each other so the surface visibly roils
+  const starOverlay = new THREE.Mesh(
+    new THREE.SphereGeometry(starRadius * 1.63, 40, 40),
+    new THREE.MeshBasicMaterial({ map: makeStarSurfaceTex(rng, st), transparent: true, opacity: 0.4,
+      blending: THREE.AdditiveBlending, depthWrite: false }),
+  );
+  starOverlay.rotation.z = 0.45;
+  systemGroup.add(starOverlay);
+
+  const starGlow = buildStarGlow(starRadius, st.light);
+  systemGroup.add(starGlow);
 
   const starLight = new THREE.PointLight(new THREE.Color(st.light), 2.5, 0, 0); // decay=0 → no falloff, distant planets stay lit
   systemGroup.add(starLight);
+  starMesh.userData = { overlay: starOverlay, glow: starGlow, light: starLight, starType: st };
 
   ambientLight = new THREE.AmbientLight(0x334466, 1.2);
   scene.add(ambientLight);
@@ -1647,11 +2154,15 @@ function generateSystem(seed, planetCount) {
   document.getElementById('btn-log').style.display = '';
   document.getElementById('btn-factions').style.display = '';
   document.getElementById('btn-control-overlay').style.display = '';
+  document.getElementById('btn-objectives').style.display = '';
+  document.getElementById('btn-objectives').classList.toggle('active', _objVisible);
+  _updateObjectives();
   updateFundsDisplay();
 }
 
 // ── Static scene objects ──────────────────────────────────
 scene.add(buildStarfield());
+scene.add(buildNebula());
 
 // ── First system ──────────────────────────────────────────
 generateSystem(42, 6);
@@ -1661,6 +2172,21 @@ renderer.setAnimationLoop(() => {
   const rawDt = clock.getDelta();
   const dt = rawDt * (paused ? 0 : simSpeed);
 
+  if (_starMesh) {
+    const now = performance.now();
+    _starMesh.rotation.y += rawDt * 0.018;
+    const ud = _starMesh.userData;
+    if (ud.overlay) ud.overlay.rotation.y -= rawDt * 0.012;
+    if (ud.glow)    ud.glow.scale.setScalar(_starRadius * 9 * (1 + 0.05 * Math.sin(now * 0.0009)));
+    if (ud.light)   ud.light.intensity = 2.5 + Math.sin(now * 0.0023) * 0.12 + Math.sin(now * 0.011) * 0.05;
+    // ambient prominences: magnetic plasma loops rise and sink every few seconds
+    if (now > _nextMiniFlare) {
+      _nextMiniFlare = now + 4000 + Math.random() * 8000;
+      _fxProminence();
+    }
+  }
+  if (showAsteroid) asteroidGroup.rotation.y += dt * 0.004;
+
   for (const p of planets) {
     p.angle += p.speed * dt;
     p.planetNode.position.set(
@@ -1669,6 +2195,10 @@ renderer.setAnimationLoop(() => {
       Math.sin(p.angle) * p.orbitR,
     );
     p.mesh.rotation.y += p.selfSpin * dt;
+    if (p.cloudMesh) p.cloudMesh.rotation.y += p.selfSpin * dt * 1.4 + rawDt * 0.01;
+    if (p._lavaPhase !== undefined)
+      p.mesh.material.emissiveIntensity = 1.1 + Math.sin(performance.now() * 0.0021 + p._lavaPhase) * 0.35;
+    if (p._kesslerRings) p._kesslerRings.rotation.y += rawDt * 0.12;
 
     for (const moon of p.moons) {
       moon.angle += moon.speed * dt;
@@ -1695,16 +2225,7 @@ renderer.setAnimationLoop(() => {
     }
   }
 
-  // Keep osculating ring anchored to nearBody as it moves
-  if (_osculatingGroup && _activePlanet?.rocket?.nearBody) {
-    _activePlanet.rocket.nearBody.mesh.getWorldPosition(_osculatingGroup.position);
-  }
-
-  // Refresh SOI detection + osculating ring every 6 frames when panel is open
-  _oscUpdateCounter++;
-  if (_activePlanet?.rocket && _oscUpdateCounter % 6 === 0) {
-    refreshOsculatingRing(_activePlanet.rocket, _activePlanet);
-  }
+  _oscUpdateCounter++;   // frame counter — throttles periodic UI refreshes below
 
   // Live-update transfer arc (follows departure planet) and alignment countdown
   if (_transferState && !_flightStates.length) {
@@ -1714,6 +2235,7 @@ renderer.setAnimationLoop(() => {
 
   for (const f of [..._flightStates]) tickFlight(f, dt);
   _tickRocketFX(rawDt);
+  _tickFXList(rawDt);
   _tickOrbitalPositions(rawDt);
   if (scheduledMissions.length) {
     checkScheduledMissions();
@@ -1724,22 +2246,30 @@ renderer.setAnimationLoop(() => {
   _simTimeAccum += dt;
   while (_simTimeAccum >= TICK_INTERVAL && homeWorld) {
     try {
+    const _hPrev = homeWorld.narrative.length;
     _stepHomeWorld();
+    _emitToastsFor(homeWorld.narrative.slice(_hPrev), homePlanet?.name ?? 'Home');
+    // Ore market drifts on overlapping cycles — colony exports earn more when prices spike
+    homeWorld.attrs.ore_market = Math.max(0.6, Math.min(1.5,
+      1 + 0.28 * Math.sin(homeWorld.tick * 0.061) + 0.17 * Math.sin(homeWorld.tick * 0.023 + 2.0)));
     for (const colony of colonies) {
       tickRandomEvents(colony);
       const prevLen = colony.world.narrative.length;
       _stepColony(colony);
-      for (const e of colony.world.narrative.slice(prevLen)) {
-        if (e.source === 'transfer_window_opens')  _onWindowOpen();
-        if (e.source === 'transfer_window_closes') _onWindowClose();
-      }
+      // Narrative transfer windows no longer slow the sim or flash the banner —
+      // dispatches auto-queue for the next window, so there is nothing to interrupt
+      // the player for. Only the mission queue and an open manual transfer slow time.
       tickConstruction(colony);
+      const _newEntries = colony.world.narrative.slice(prevLen);
+      _emitToastsFor(_newEntries, colony.planet.name, colony.world);
+      _triggerEventFX(_newEntries, colony);
       // Population-based income
       const _minerPop  = colony.world.attrs.miner_pop ?? 20;
       const _synthPop  = colony.world.factions['synths']?.attrs.population ?? 0;
       const _mDisp     = colony.world.factions['miners'].disposition;
       const _sDisp     = colony.world.factions['synths']?.disposition ?? 'dormant';
-      const _prodMult  = Math.max(0.5, Math.min(2.0, 1 + (colony.world.attrs.production_bonus ?? 0)));
+      const _prodMult  = Math.max(0.5, Math.min(2.0, 1 + (colony.world.attrs.production_bonus ?? 0)))
+                       * (colony.world.attrs.income_mult ?? 1);
       let _income;
       if (colony.world.attrs.miners_militia) {
         _income = 0;
@@ -1758,12 +2288,15 @@ renderer.setAnimationLoop(() => {
         const _sEff = colony.world.attrs.synths_ever_deployed
           ? ({ dormant: 0, aware: 0.9, organized: 0.7, free: 0.3 }[_sDisp] ?? 0.9)
           : 0;
-        _income = Math.floor((_minerPop * 0.6 * _mEff + _synthPop * 1.0 * _sEff) * _prodMult);
+        _income = Math.floor((_minerPop * 0.6 * _mEff + _synthPop * 1.0 * _sEff) * _prodMult
+                             * (homeWorld.attrs.ore_market ?? 1));
       }
       homeWorld.attrs.player_funds = (homeWorld.attrs.player_funds ?? 0) + _income;
-      // Population growth — terraforming doubles rate and allows restless growth too
+      // Population growth — terraforming doubles rate and allows restless growth too;
+      // fertile worlds (water/ocean) grow faster still
       const _terraformed   = !!colony.world.attrs.structures?.terraforming_array;
-      const _growInterval  = _terraformed ? 20 : 40;
+      const _growTrait     = COLONY_TRAITS[colony.planet.type]?.growth ?? 1;
+      const _growInterval  = Math.max(10, Math.round((_terraformed ? 20 : 40) * _growTrait));
       const _growOk        = _mDisp === 'content' || (_terraformed && _mDisp === 'restless');
       if (homeWorld.tick % _growInterval === 0 && _growOk && _minerPop < 50)
         colony.world.attrs.miner_pop = _minerPop + 1;
@@ -1779,6 +2312,8 @@ renderer.setAnimationLoop(() => {
     _simTimeAccum -= TICK_INTERVAL;
     _syncColonyVisuals();
     _updateControlOverlays();
+    _checkEndConditions();
+    _updateObjectives();
     updateFundsDisplay();
     if (_logVisible) updateColonyLog();
     updateFactionDisplay();
@@ -1842,27 +2377,86 @@ document.getElementById('btn-orbits').addEventListener('click', function () {
 
 document.getElementById('btn-asteroid').addEventListener('click', function () {
   showAsteroid = !showAsteroid;
-  this.textContent = showAsteroid ? 'Asteroids: ON' : 'Asteroid Belt';
+  this.textContent = showAsteroid ? 'Asteroids: ON' : 'Asteroids';
   this.classList.toggle('active', showAsteroid);
   if (showAsteroid) systemGroup.add(asteroidGroup);
   else systemGroup.remove(asteroidGroup);
 });
 
+// ── System menu (worldgen controls live here, out of the topbar) ──
+document.getElementById('btn-system').addEventListener('click', function (e) {
+  e.stopPropagation();
+  const menu = document.getElementById('system-menu');
+  const open = menu.style.display === 'none';
+  menu.style.display = open ? 'block' : 'none';
+  this.classList.toggle('active', open);
+});
+document.addEventListener('pointerdown', e => {
+  const menu = document.getElementById('system-menu');
+  if (menu.style.display === 'none') return;
+  if (e.target.closest && e.target.closest('#system-menu, #btn-system')) return;
+  menu.style.display = 'none';
+  document.getElementById('btn-system').classList.remove('active');
+});
+
+// ── Generic collapsible section headers (data-collapse="<bodyId>") ──
+for (const hdr of document.querySelectorAll('[data-collapse]')) {
+  hdr.addEventListener('click', () => {
+    const body = document.getElementById(hdr.dataset.collapse);
+    if (!body) return;
+    const open = body.style.display === 'none';
+    body.style.display = open ? '' : 'none';
+    const arrow = hdr.querySelector('.op-collapse-arrow');
+    if (arrow) arrow.textContent = open ? '▾ hide' : '▸ show';
+  });
+}
+
 
 function updateSpeedUI() {
-  document.getElementById('sim-speed-label').textContent = SIM_SPEEDS[simSpeedIdx] + '×';
+  const lbl = document.getElementById('sim-speed-label');
+  lbl.textContent = SIM_SPEEDS[simSpeedIdx] + '×';
+  const autoSlowed = _windowSavedSpeedIdx !== null;
+  lbl.style.color = autoSlowed ? '#fc8' : '#bbc';
+  lbl.title = autoSlowed ? 'Slowed for a transfer window — speed restores when it closes' : '';
   document.getElementById('btn-slower').disabled = simSpeedIdx === 0;
   document.getElementById('btn-faster').disabled = simSpeedIdx === SIM_SPEEDS.length - 1;
   document.getElementById('btn-pause').textContent = paused ? '▶' : '⏸';
   document.getElementById('btn-pause').classList.toggle('active', paused);
 }
 
+// Manual speed change is authoritative: cancel any pending window auto-restore
+function _userSetSpeed(idx) {
+  simSpeedIdx = Math.max(0, Math.min(SIM_SPEEDS.length - 1, idx));
+  simSpeed = SIM_SPEEDS[simSpeedIdx];
+  _windowSavedSpeedIdx = null;
+  updateSpeedUI();
+}
+
 function updateFundsDisplay() {
   const el = document.getElementById('topbar-funds');
   const pe = document.getElementById('topbar-pop');
-  if (!homeWorld) { el.style.display = 'none'; pe.style.display = 'none'; return; }
+  if (!homeWorld) { el.style.display = 'none'; pe.style.display = 'none'; _lastFundsShown = null; return; }
   el.style.display = '';
-  el.textContent = '₡ ' + Math.round(homeWorld.attrs.player_funds ?? 0).toLocaleString();
+  const funds = Math.round(homeWorld.attrs.player_funds ?? 0);
+  el.textContent = '₡ ' + funds.toLocaleString();
+  el.style.color = funds < 0 ? '#f65' : '';
+  // pulse on meaningful change (skip per-tick trickle)
+  if (_lastFundsShown !== null && Math.abs(funds - _lastFundsShown) >= 100) {
+    el.classList.remove('f-up', 'f-down');
+    void el.offsetWidth;   // restart animation
+    el.classList.add(funds > _lastFundsShown ? 'f-up' : 'f-down');
+  }
+  _lastFundsShown = funds;
+  const me = document.getElementById('topbar-market');
+  const market = homeWorld.attrs.ore_market;
+  if (market !== undefined && colonies.length) {
+    const pct = Math.round((market - 1) * 100);
+    me.style.display = '';
+    me.textContent = `ORE ${pct >= 0 ? '+' : ''}${pct}%`;
+    me.style.color = pct >= 15 ? '#5fc' : pct <= -15 ? '#f76' : '#889';
+  } else {
+    me.style.display = 'none';
+  }
   const totalPop = colonies.reduce((s, c) => s + (c.world.attrs.miner_pop ?? 0), 0);
   pe.style.display = colonies.length ? '' : 'none';
   pe.textContent = 'POP ' + totalPop;
@@ -1877,7 +2471,8 @@ function updateColonyStats() {
   const mDisp = w.factions['miners'].disposition;
   const sDisp = w.factions['synths']?.disposition ?? 'dormant';
   const sPop  = w.factions['synths']?.attrs.population ?? 0;
-  const prodMult = Math.max(0.5, Math.min(2.0, 1 + (w.attrs.production_bonus ?? 0)));
+  const prodMult = Math.max(0.5, Math.min(2.0, 1 + (w.attrs.production_bonus ?? 0)))
+                 * (w.attrs.income_mult ?? 1);
   let income;
   if (w.attrs.miners_militia) {
     income = 0;
@@ -1888,16 +2483,20 @@ function updateColonyStats() {
   } else {
     const mEff = { content: 1.0, restless: 0.8, striking: 0.2, revolutionary: 0.4 }[mDisp] ?? 1.0;
     const sEff = w.attrs.synths_ever_deployed ? ({ dormant: 0, aware: 0.9, organized: 0.7, free: 0.3 }[sDisp] ?? 0.9) : 0;
-    income = Math.floor((pop * 0.6 * mEff + sPop * 1.0 * sEff) * prodMult);
+    income = Math.floor((pop * 0.6 * mEff + sPop * 1.0 * sEff) * prodMult
+                        * (homeWorld.attrs.ore_market ?? 1));
   }
   const army = w.attrs.army_size ?? 0;
   const terraformed = !!w.attrs.structures?.terraforming_array;
-  const growInterval = terraformed ? 20 : 40;
+  const growTrait = COLONY_TRAITS[activeColony.planet.type]?.growth ?? 1;
+  const growInterval = Math.max(10, Math.round((terraformed ? 20 : 40) * growTrait));
   const stat = (label, val, col) =>
     `<div style="color:#667">${label}</div><div style="color:${col ?? '#ccd'}">${val}</div>`;
+  const yieldMult = w.attrs.income_mult ?? 1;
   el.innerHTML =
     stat('Workers', pop + '/50', pop >= 50 ? '#fa8' : pop >= 30 ? '#5fc' : '#ccd') +
     stat('Income/tick', '₡' + income, income === 0 ? '#a55' : income >= 30 ? '#5fc' : '#ccd') +
+    stat('World yield', '×' + yieldMult.toFixed(2), yieldMult >= 1.3 ? '#fc8' : yieldMult >= 1 ? '#5fc' : '#aab') +
     stat('Synths', sPop > 0 || w.attrs.synths_departed
       ? (w.attrs.synths_departed ? `departed — colony: ${w.attrs.synth_colony_pop ?? 0}`
         : sPop + ' (' + (w.attrs.synths_suppressed ? 'SUPPRESSED'
@@ -2181,11 +2780,11 @@ const ORBITAL_TYPES = {
 };
 
 const COMMS_UPGRADES = [
-  { level: 1, label: 'Reserve Burns',    cost: 500,  buildTime: 12, desc: 'Anytime launches — 6-tick transit' },
-  { level: 2, label: 'Ion Drives',       cost: 800,  buildTime: 18, desc: 'Faster anytime transit — 3 ticks' },
-  { level: 3, label: 'Alien Propulsion', cost: 1200, buildTime: 25, desc: '1-tick transit — requires ancient ruins',
+  { level: 1, label: 'Reserve Burns',    cost: 500,  buildTime: 12, desc: 'Launch anytime — off-window ×1.75 cost, 10% faster transit' },
+  { level: 2, label: 'Ion Drives',       cost: 800,  buildTime: 18, desc: 'Off-window ×1.4 cost, 35% faster transit' },
+  { level: 3, label: 'Alien Propulsion', cost: 1200, buildTime: 25, desc: 'Off-window ×1.15 cost, 55% faster — requires ancient ruins',
     req: () => colonies.some(c => c.world.attrs.ancient_ruins_present) },
-  { level: 4, label: 'Quantum Relay',    cost: 2000, buildTime: 30, desc: 'Instant — windows eliminated' },
+  { level: 4, label: 'Quantum Relay',    cost: 2000, buildTime: 30, desc: 'No off-window penalty, 75% faster transit' },
 ];
 
 const TIER_NAMES = ['Hohmann Transfer', 'Reserve Burns', 'Ion Drives', 'Alien Propulsion', 'Quantum Relay'];
@@ -2351,12 +2950,70 @@ function _addRuinsMarker(planet) {
   planet._ruinsMarker = marker;
 }
 
+// Settlement city-lights: a glowing cluster on the surface that grows with population
+function _makeSettlementGlowTex() {
+  if (_makeSettlementGlowTex._tex) return _makeSettlementGlowTex._tex;
+  const S = 64;
+  const c = document.createElement('canvas'); c.width = c.height = S;
+  const ctx = c.getContext('2d');
+  const g = ctx.createRadialGradient(S/2, S/2, 0, S/2, S/2, S/2);
+  g.addColorStop(0, 'rgba(255,225,150,0.85)');
+  g.addColorStop(0.4, 'rgba(255,200,110,0.25)');
+  g.addColorStop(1, 'rgba(0,0,0,0)');
+  ctx.fillStyle = g; ctx.fillRect(0, 0, S, S);
+  _makeSettlementGlowTex._tex = new THREE.CanvasTexture(c);
+  return _makeSettlementGlowTex._tex;
+}
+
+function _updateSettlementVisuals(colony) {
+  const p = colony.planet;
+  const pop = colony.world.attrs.miner_pop ?? 0;
+  if (!p._settlement) {
+    const group = new THREE.Group();
+    // fixed site on the surface, offset from the ruins marker location
+    const dir = new THREE.Vector3(-0.55, 0.35, 0.76).normalize();
+    group.userData = { dir, lights: 0 };
+    const glow = new THREE.Sprite(new THREE.SpriteMaterial({
+      map: _makeSettlementGlowTex(), transparent: true, opacity: 0.0,
+      depthWrite: false, blending: THREE.AdditiveBlending,
+    }));
+    glow.position.copy(dir).multiplyScalar(p.radius * 1.04);
+    glow.scale.setScalar(p.radius * 0.5);
+    group.add(glow);
+    group.userData.glow = glow;
+    p.planetNode.add(group);
+    p._settlement = group;
+  }
+  const s = p._settlement;
+  const want = Math.min(14, 1 + Math.floor(pop / 4));
+  const mat = s.userData.lightMat ?? (s.userData.lightMat =
+    new THREE.MeshBasicMaterial({ color: 0xffdf9a }));
+  while (s.userData.lights < want) {
+    const d = s.userData.dir.clone();
+    d.x += (Math.random() - 0.5) * 0.22;
+    d.y += (Math.random() - 0.5) * 0.22;
+    d.z += (Math.random() - 0.5) * 0.22;
+    d.normalize();
+    const sz = p.radius * (0.02 + Math.random() * 0.025);
+    const dome = new THREE.Mesh(new THREE.BoxGeometry(sz, sz * 0.7, sz), mat);
+    dome.position.copy(d).multiplyScalar(p.radius * 1.0);
+    dome.lookAt(0, 0, 0);
+    s.add(dome);
+    s.userData.lights++;
+  }
+  // glow intensity & size track population
+  const t = Math.min(1, pop / 50);
+  s.userData.glow.material.opacity = 0.25 + t * 0.5;
+  s.userData.glow.scale.setScalar(p.radius * (0.45 + t * 0.85));
+}
+
 function _syncColonyVisuals() {
   for (const c of colonies) {
     if (c.world.attrs.kessler_active)                    _buildKesslerRings(c.planet);
     if (c.world.attrs.planet_irradiated)                 _applyIrradiationOverlay(c.planet);
     if (c.world.attrs.ancient_ruins_present)             _addRuinsMarker(c.planet);
     if (c.world.attrs.structures?.terraforming_array)    _applyTerraformingVisuals(c.planet);
+    _updateSettlementVisuals(c);
   }
 }
 
@@ -2391,22 +3048,84 @@ function _updateControlOverlays() {
 // ── Orbital assets (stations & weapons) ──────────────────────
 function _orbitalOrbitR(planet) { return planet.radius * 5.5; }
 
+// Space station: hub cylinder, habitat ring, twin solar arrays, comm mast
+function _buildStationMesh(r) {
+  const g = new THREE.Group();
+  const hull  = new THREE.MeshPhongMaterial({ color: 0xb8c4d4, shininess: 60 });
+  const dark  = new THREE.MeshPhongMaterial({ color: 0x55606e, shininess: 30 });
+  const panel = new THREE.MeshPhongMaterial({ color: 0x1a3a8a, shininess: 90,
+    emissive: new THREE.Color(0x0a1a44), emissiveIntensity: 0.6, side: THREE.DoubleSide });
+
+  const hub = new THREE.Mesh(new THREE.CylinderGeometry(r*0.05, r*0.05, r*0.22, 10), hull);
+  g.add(hub);
+  const ring = new THREE.Mesh(new THREE.TorusGeometry(r*0.15, r*0.022, 8, 28), hull);
+  ring.rotation.x = Math.PI / 2;
+  g.add(ring);
+  for (let i = 0; i < 4; i++) {     // spokes
+    const spoke = new THREE.Mesh(new THREE.CylinderGeometry(r*0.008, r*0.008, r*0.3, 5), dark);
+    spoke.rotation.z = Math.PI / 2;
+    spoke.rotation.y = (i / 4) * Math.PI * 2;
+    g.add(spoke);
+  }
+  for (const side of [1, -1]) {     // solar wings
+    const arm = new THREE.Mesh(new THREE.CylinderGeometry(r*0.007, r*0.007, r*0.1, 5), dark);
+    arm.position.y = side * r * 0.16;
+    g.add(arm);
+    const wing = new THREE.Mesh(new THREE.BoxGeometry(r*0.34, r*0.005, r*0.1), panel);
+    wing.position.y = side * r * 0.23;
+    g.add(wing);
+  }
+  const mast = new THREE.Mesh(new THREE.ConeGeometry(r*0.015, r*0.08, 6), dark);
+  mast.position.y = r * 0.17;
+  g.add(mast);
+  const beacon = new THREE.Mesh(new THREE.SphereGeometry(r*0.014, 6, 6),
+    new THREE.MeshBasicMaterial({ color: 0x66ccff }));
+  beacon.position.y = r * 0.22;
+  g.add(beacon);
+  return g;
+}
+
+// Orbital weapon: rail platform — barrel along +Z so lookAt(planet) aims it
+function _buildWeaponMesh(r) {
+  const g = new THREE.Group();
+  const hull = new THREE.MeshPhongMaterial({ color: 0x7a8494, shininess: 50 });
+  const dark = new THREE.MeshPhongMaterial({ color: 0x3a4048, shininess: 25 });
+
+  const body = new THREE.Mesh(new THREE.CylinderGeometry(r*0.045, r*0.06, r*0.22, 8), hull);
+  body.rotation.x = Math.PI / 2;
+  g.add(body);
+  const barrel = new THREE.Mesh(new THREE.CylinderGeometry(r*0.016, r*0.022, r*0.26, 8), dark);
+  barrel.rotation.x = Math.PI / 2;
+  barrel.position.z = r * 0.2;
+  g.add(barrel);
+  const muzzle = new THREE.Mesh(new THREE.SphereGeometry(r*0.022, 6, 6),
+    new THREE.MeshBasicMaterial({ color: 0xff5533, transparent: true, opacity: 0.9,
+      blending: THREE.AdditiveBlending, depthWrite: false }));
+  muzzle.position.z = r * 0.33;
+  g.add(muzzle);
+  for (let i = 0; i < 4; i++) {     // radiator fins at the stern
+    const fin = new THREE.Mesh(new THREE.BoxGeometry(r*0.004, r*0.09, r*0.1), dark);
+    const a = (i / 4) * Math.PI * 2 + Math.PI / 4;
+    fin.position.set(Math.cos(a) * r * 0.06, Math.sin(a) * r * 0.06, -r * 0.13);
+    fin.rotation.z = a;
+    g.add(fin);
+  }
+  return g;
+}
+
 function _spawnOrbitalMesh(orb) {
-  const t = ORBITAL_TYPES[orb.type];
   const r = orb.planet.radius;
-  const geo = orb.type === 'station'
-    ? new THREE.BoxGeometry(r * 0.28, r * 0.08, r * 0.28)
-    : new THREE.OctahedronGeometry(r * 0.22);
-  const mat = new THREE.MeshBasicMaterial({ color: t.color });
-  orb.mesh = new THREE.Mesh(geo, mat);
+  orb.mesh = orb.type === 'station' ? _buildStationMesh(r) : _buildWeaponMesh(r);
   orb.planet.planetNode.add(orb.mesh);
 }
 
 function _removeOrbitalMesh(orb) {
   if (orb.mesh) {
     if (orb.planet) orb.planet.planetNode.remove(orb.mesh);
-    orb.mesh.geometry.dispose();
-    orb.mesh.material.dispose();
+    orb.mesh.traverse(o => {
+      if (o.geometry) o.geometry.dispose();
+      if (o.material) (Array.isArray(o.material) ? o.material : [o.material]).forEach(m => m.dispose());
+    });
     orb.mesh = null;
   }
 }
@@ -2444,6 +3163,7 @@ function tickOrbitalConstruction() {
   }
 }
 
+const _orbAimTarget = new THREE.Vector3();
 function _tickOrbitalPositions(dt) {
   for (const orb of orbitals) {
     if (!orb.mesh || !orb.planet || orb.buildDoneAt !== null) continue;
@@ -2454,7 +3174,13 @@ function _tickOrbitalPositions(dt) {
       Math.sin(orb.angle * 0.4) * orb.planet.radius * 0.8,
       Math.sin(orb.angle) * oR
     );
-    orb.mesh.rotation.y += dt * 1.2;
+    if (orb.type === 'weapon') {
+      // keep the barrel trained on the planet below
+      orb.planet.planetNode.getWorldPosition(_orbAimTarget);
+      orb.mesh.lookAt(_orbAimTarget);
+    } else {
+      orb.mesh.rotation.y += dt * 0.5;
+    }
   }
 }
 
@@ -2570,6 +3296,15 @@ function _spawnExplosionFlash(planet) {
   const mat = new THREE.MeshBasicMaterial({ color: 0xff7700, transparent: true, opacity: 0.85, depthWrite: false, blending: THREE.AdditiveBlending });
   const flash = new THREE.Mesh(geo, mat);
   planet.planetNode.add(flash);
+  AudioSys.explosion();
+  // radial debris sparks (reuses the exhaust particle pool, world space)
+  const wp = new THREE.Vector3();
+  planet.mesh.getWorldPosition(wp);
+  for (let k = 0; k < 12; k++) {
+    const a = (k / 12) * Math.PI * 2 + Math.random() * 0.5;
+    _emitExhaust(wp.x, wp.y + (Math.random() - 0.5) * planet.radius,
+                 wp.z, Math.cos(a), 0, Math.sin(a), planet.radius * 5, 2);
+  }
   let t = 0;
   const tick = () => {
     t += 0.05;
@@ -2691,6 +3426,16 @@ function _emitExhaust(wx, wy, wz, dx, dy, dz, speed, n) {
 }
 
 function _tickRocketFX(rawDt) {
+  // Nav beacons pulse, idle engines flicker — on parked rockets and in-flight clones
+  // (clones share the original's materials, so one write covers both)
+  const _now = performance.now();
+  const beaconPulse = 0.25 + 0.75 * Math.pow(0.5 + 0.5 * Math.sin(_now * 0.005), 3);
+  const engineFlick = 0.55 + 0.2 * Math.sin(_now * 0.013) + 0.08 * Math.sin(_now * 0.041);
+  for (const p of planets) {
+    const ud = p.rocket?.mesh?.userData;
+    if (ud?.beaconMat) { ud.beaconMat.opacity = beaconPulse; ud.engineMat.opacity = engineFlick; }
+  }
+
   // Update particle positions
   for (let i = 0; i < _PTCL; i++) {
     const b = i*7;
@@ -2752,6 +3497,454 @@ function _tickRocketFX(rawDt) {
       f.retroGlow.material.opacity = fade * (0.5 + Math.sin(performance.now()*0.04)*0.15);
       f.retroGlow.visible = fade > 0;
     }
+  }
+}
+
+// ── Event visual FX ───────────────────────────────────────────────────────────
+// Each FX is { update(rawDt)→bool (false = done), cleanup() }. Driven by real
+// time so effects look identical at any sim speed.
+
+function _tickFXList(rawDt) {
+  for (let i = _fxList.length - 1; i >= 0; i--) {
+    let alive = false;
+    try { alive = _fxList[i].update(rawDt); }
+    catch (err) { console.warn('FX error:', err.message); alive = false; }
+    if (!alive) { _fxList[i].cleanup?.(); _fxList.splice(i, 1); }
+  }
+}
+
+const _glowTexCache = {};
+function _makeGlowTex(r, g, b) {
+  const key = `${r},${g},${b}`;
+  if (_glowTexCache[key]) return _glowTexCache[key];
+  const S = 64;
+  const c = document.createElement('canvas'); c.width = c.height = S;
+  const ctx = c.getContext('2d');
+  const grad = ctx.createRadialGradient(S/2, S/2, 0, S/2, S/2, S/2);
+  grad.addColorStop(0, `rgba(255,255,255,0.95)`);
+  grad.addColorStop(0.3, `rgba(${r},${g},${b},0.55)`);
+  grad.addColorStop(1, 'rgba(0,0,0,0)');
+  ctx.fillStyle = grad; ctx.fillRect(0, 0, S, S);
+  return _glowTexCache[key] = new THREE.CanvasTexture(c);
+}
+function _glowSprite(r, g, b, scale) {
+  const s = new THREE.Sprite(new THREE.SpriteMaterial({
+    map: _makeGlowTex(r, g, b), transparent: true,
+    depthWrite: false, blending: THREE.AdditiveBlending,
+  }));
+  s.scale.setScalar(scale);
+  return s;
+}
+
+// Solar flare: jet of plasma erupts from the star + glow pulse.
+// intensity 1 = full event flare (with glow pulse); <1 = ambient mini-flare.
+function _fxSolarFlare(intensity = 1) {
+  if (!systemGroup || !_starRadius) return;
+  const full = intensity >= 1;
+  if (full && _fxSolarFlare._active) return;
+  if (full) _fxSolarFlare._active = true;
+  const N = Math.round(110 * Math.max(0.25, intensity));
+  const pos = new Float32Array(N * 3);
+  const col = new Float32Array(N * 3);
+  const vel = [];
+  // jet direction biased toward the ecliptic so it sweeps past planets
+  const ja = Math.random() * Math.PI * 2;
+  const jet = new THREE.Vector3(Math.cos(ja), (Math.random() - 0.5) * 0.5, Math.sin(ja)).normalize();
+  const sr = _starRadius * 1.6;
+  for (let i = 0; i < N; i++) {
+    const spread = 0.28;
+    const d = jet.clone();
+    d.x += (Math.random() - 0.5) * spread;
+    d.y += (Math.random() - 0.5) * spread;
+    d.z += (Math.random() - 0.5) * spread;
+    d.normalize();
+    pos[i*3] = d.x * sr; pos[i*3+1] = d.y * sr; pos[i*3+2] = d.z * sr;
+    vel.push(d.multiplyScalar(sr * (0.7 + Math.random() * 1.6) * (0.5 + 0.5 * intensity)));
+    const t = Math.random();
+    col[i*3] = 1; col[i*3+1] = 0.5 + t * 0.4; col[i*3+2] = t * 0.25;
+  }
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  geo.setAttribute('color',    new THREE.BufferAttribute(col, 3));
+  const mat = new THREE.PointsMaterial({
+    size: 2.6, vertexColors: true, transparent: true, opacity: 0.95,
+    blending: THREE.AdditiveBlending, depthWrite: false,
+  });
+  const pts = new THREE.Points(geo, mat);
+  pts.frustumCulled = false;
+  systemGroup.add(pts);
+  const glow = full ? _glowSprite(255, 160, 60, sr * 5) : null;
+  if (glow) systemGroup.add(glow);
+  let t = 0;
+  const DUR = 4.2 * (0.6 + 0.4 * intensity);
+  _fxList.push({
+    update(dt) {
+      t += dt;
+      const p = geo.attributes.position.array;
+      for (let i = 0; i < N; i++) {
+        p[i*3] += vel[i].x * dt; p[i*3+1] += vel[i].y * dt; p[i*3+2] += vel[i].z * dt;
+      }
+      geo.attributes.position.needsUpdate = true;
+      const f = t / DUR;
+      mat.opacity = Math.max(0, 0.95 * (1 - f)) * Math.min(1, intensity + 0.3);
+      if (glow) {
+        const pulse = f < 0.18 ? f / 0.18 : Math.max(0, 1 - (f - 0.18) / 0.5);
+        glow.material.opacity = pulse * 0.85;
+        glow.scale.setScalar(sr * (5 + f * 6));
+      }
+      return t < DUR;
+    },
+    cleanup() {
+      if (full) _fxSolarFlare._active = false;
+      systemGroup?.remove(pts);
+      geo.dispose(); mat.dispose();
+      if (glow) { systemGroup?.remove(glow); glow.material.dispose(); }
+    },
+  });
+}
+
+// Prominence: a magnetic loop anchored to the star's surface — plasma particles
+// flow along a bezier spline that exits and re-enters the photosphere.
+function _fxProminence() {
+  if (!systemGroup || !_starRadius) return;
+  const R = _starRadius * 1.6;   // visual surface radius of the star mesh
+  const st = _starMesh?.userData.starType;
+  const cFoot = new THREE.Color(st?.outer ?? '#ffaa00');
+  const cApex = new THREE.Color(st?.mid ?? '#fffccc');
+
+  // two footpoints separated by a small surface angle, loop arched between them
+  const d1 = new THREE.Vector3(Math.random() - 0.5, Math.random() - 0.5, Math.random() - 0.5).normalize();
+  let axis = new THREE.Vector3(Math.random() - 0.5, Math.random() - 0.5, Math.random() - 0.5).cross(d1);
+  if (axis.lengthSq() < 1e-6) axis.set(0, 1, 0).cross(d1);
+  axis.normalize();
+  const span = 0.18 + Math.random() * 0.35;          // radians along the surface
+  const d2 = d1.clone().applyAxisAngle(axis, span);
+  const lift = 1.18 + Math.random() * 0.45;          // loop height above surface
+  const curve = new THREE.CubicBezierCurve3(
+    d1.clone().multiplyScalar(R * 0.98),
+    d1.clone().multiplyScalar(R * lift),
+    d2.clone().multiplyScalar(R * lift),
+    d2.clone().multiplyScalar(R * 0.98),
+  );
+  const SAMPLES = 48;
+  const path = curve.getPoints(SAMPLES);             // SAMPLES+1 points
+
+  // faint continuous filament so the loop reads at a distance
+  const lineMat = new THREE.LineBasicMaterial({
+    color: cFoot, transparent: true, opacity: 0,
+    blending: THREE.AdditiveBlending, depthWrite: false,
+  });
+  const line = new THREE.Line(new THREE.BufferGeometry().setFromPoints(path), lineMat);
+  systemGroup.add(line);
+
+  // plasma particles streaming along the field line
+  const N = 36;
+  const pos = new Float32Array(N * 3);
+  const col = new Float32Array(N * 3);
+  const flow = [];
+  for (let i = 0; i < N; i++) {
+    flow.push({ t: Math.random(), speed: 0.10 + Math.random() * 0.16 });
+    const mix = Math.random();
+    const c = cFoot.clone().lerp(cApex, mix);
+    const bright = 0.7 + Math.random() * 0.3;
+    col[i*3] = c.r * bright; col[i*3+1] = c.g * bright; col[i*3+2] = c.b * bright;
+  }
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  geo.setAttribute('color',    new THREE.BufferAttribute(col, 3));
+  const mat = new THREE.PointsMaterial({
+    size: _starRadius * 0.07, vertexColors: true, transparent: true, opacity: 0,
+    blending: THREE.AdditiveBlending, depthWrite: false,
+  });
+  const pts = new THREE.Points(geo, mat);
+  pts.frustumCulled = false;
+  systemGroup.add(pts);
+
+  let t = 0;
+  const DUR = 7 + Math.random() * 6;
+  _fxList.push({
+    update(dt) {
+      t += dt;
+      // grow in, hold, sink back into the surface
+      const env = Math.min(1, t / 1.6, (DUR - t) / 2.0);
+      mat.opacity = Math.max(0, env) * 0.9;
+      lineMat.opacity = Math.max(0, env) * 0.14;
+      const p = geo.attributes.position.array;
+      for (let i = 0; i < N; i++) {
+        const f = flow[i];
+        f.t += f.speed * dt;
+        if (f.t >= 1) f.t -= 1;
+        const fi = f.t * SAMPLES;
+        const i0 = Math.floor(fi), frac = fi - i0;
+        const a = path[i0], b = path[Math.min(i0 + 1, SAMPLES)];
+        p[i*3]   = a.x + (b.x - a.x) * frac;
+        p[i*3+1] = a.y + (b.y - a.y) * frac;
+        p[i*3+2] = a.z + (b.z - a.z) * frac;
+      }
+      geo.attributes.position.needsUpdate = true;
+      return t < DUR;
+    },
+    cleanup() {
+      systemGroup?.remove(pts); systemGroup?.remove(line);
+      geo.dispose(); mat.dispose();
+      line.geometry.dispose(); lineMat.dispose();
+    },
+  });
+}
+
+// Meteor: streaks in from deep space and impacts the colony planet
+function _fxMeteor(planet) {
+  const head = new THREE.Mesh(
+    new THREE.SphereGeometry(Math.max(0.6, planet.radius * 0.09), 8, 8),
+    new THREE.MeshBasicMaterial({ color: 0xffd9a0 }),
+  );
+  head.add(_glowSprite(255, 170, 80, planet.radius * 0.9));
+  scene.add(head);
+  const dir = new THREE.Vector3(Math.random() - 0.5, 0.25 + Math.random() * 0.4, Math.random() - 0.5).normalize();
+  const wp = new THREE.Vector3();
+  let t = 0;
+  const DUR = 1.5;
+  _fxList.push({
+    update(dt) {
+      t += dt;
+      const f = Math.min(1, t / DUR);
+      planet.mesh.getWorldPosition(wp);
+      const alt = planet.radius * (10 * (1 - f) * (1 - f) + 1.0);
+      head.position.copy(wp).addScaledVector(dir, alt);
+      // glowing trail behind the head
+      _emitExhaust(head.position.x, head.position.y, head.position.z,
+                   dir.x, dir.y, dir.z, planet.radius * 4, 2);
+      if (f >= 1) { _spawnExplosionFlash(planet); return false; }
+      return true;
+    },
+    cleanup() {
+      scene.remove(head);
+      head.geometry.dispose(); head.material.dispose();
+      head.children[0]?.material.dispose();
+    },
+  });
+}
+
+// Aurora: shimmering polar rings during a stellar-wind storm
+function _fxAurora(planet) {
+  const rings = [];
+  for (const sign of [1, -1]) {
+    const ring = new THREE.Mesh(
+      new THREE.TorusGeometry(planet.radius * 0.55, planet.radius * 0.07, 8, 48),
+      new THREE.MeshBasicMaterial({ color: 0x44ffaa, transparent: true, opacity: 0,
+        blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide }),
+    );
+    ring.position.y = sign * planet.radius * 0.82;
+    ring.rotation.x = Math.PI / 2;
+    planet.planetNode.add(ring);
+    rings.push(ring);
+  }
+  let t = 0;
+  const DUR = 14;
+  _fxList.push({
+    update(dt) {
+      t += dt;
+      const f = t / DUR;
+      const envelope = Math.sin(Math.PI * Math.min(1, f));
+      const shimmer = 0.7 + 0.3 * Math.sin(performance.now() * 0.004);
+      for (const ring of rings) {
+        ring.material.opacity = envelope * shimmer * 0.5;
+        ring.rotation.z += dt * 0.3;
+      }
+      return t < DUR;
+    },
+    cleanup() {
+      for (const ring of rings) {
+        planet.planetNode.remove(ring);
+        ring.geometry.dispose(); ring.material.dispose();
+      }
+    },
+  });
+}
+
+// Nuclear catastrophe: white flash, orange shell, lingering surface fire
+function _fxNuke(planet) {
+  AudioSys.explosion();
+  setTimeout(() => AudioSys.explosion(), 350);
+  const shell = (color, delay, grow, dur) => {
+    const m = new THREE.Mesh(
+      new THREE.SphereGeometry(planet.radius * 0.5, 16, 16),
+      new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0,
+        blending: THREE.AdditiveBlending, depthWrite: false }),
+    );
+    planet.planetNode.add(m);
+    let t = -delay;
+    _fxList.push({
+      update(dt) {
+        t += dt;
+        if (t < 0) return true;
+        const f = t / dur;
+        m.scale.setScalar(1 + f * grow);
+        m.material.opacity = Math.max(0, 0.9 * (1 - f));
+        return f < 1;
+      },
+      cleanup() { planet.planetNode.remove(m); m.geometry.dispose(); m.material.dispose(); },
+    });
+  };
+  shell(0xffffff, 0,    7,  0.7);
+  shell(0xff7722, 0.25, 11, 1.4);
+  // debris
+  const wp = new THREE.Vector3();
+  planet.mesh.getWorldPosition(wp);
+  for (let k = 0; k < 18; k++) {
+    const a = Math.random() * Math.PI * 2;
+    _emitExhaust(wp.x, wp.y + (Math.random() - 0.5) * planet.radius, wp.z,
+                 Math.cos(a), 0, Math.sin(a), planet.radius * 7, 2);
+  }
+  // lingering fire glow on the surface
+  const fire = _glowSprite(255, 60, 20, planet.radius * 1.6);
+  fire.position.set(planet.radius * 0.7, planet.radius * 0.3, planet.radius * 0.55);
+  planet.planetNode.add(fire);
+  let ft = 0;
+  const FDUR = 7;
+  _fxList.push({
+    update(dt) {
+      ft += dt;
+      fire.material.opacity = Math.max(0, 0.7 * (1 - ft / FDUR)) * (0.8 + 0.2 * Math.sin(performance.now() * 0.013));
+      return ft < FDUR;
+    },
+    cleanup() { planet.planetNode.remove(fire); fire.material.dispose(); },
+  });
+}
+
+// Comet: crosses the system on a sun-grazing path, tail always anti-sunward
+function _fxComet() {
+  if (!systemGroup || _fxComet._active) return;
+  _fxComet._active = true;
+  const R = (planets.at(-1)?.orbitR ?? 300) * 1.35;
+  const a0 = Math.random() * Math.PI * 2;
+  const a1 = a0 + 2.2 + Math.random() * 1.2;
+  const start = new THREE.Vector3(Math.cos(a0) * R, (Math.random() - 0.5) * R * 0.12, Math.sin(a0) * R);
+  const end   = new THREE.Vector3(Math.cos(a1) * R, (Math.random() - 0.5) * R * 0.12, Math.sin(a1) * R);
+  const periDir = start.clone().add(end).normalize().negate();
+  const ctrl = periDir.multiplyScalar(_starRadius * 6);   // perihelion control point
+
+  const head = new THREE.Mesh(
+    new THREE.SphereGeometry(2.2, 10, 10),
+    new THREE.MeshBasicMaterial({ color: 0xeefcff }),
+  );
+  head.add(_glowSprite(170, 220, 255, 16));
+  const tail = new THREE.Mesh(
+    new THREE.ConeGeometry(3.2, 1, 8, 1, true),
+    new THREE.MeshBasicMaterial({ color: 0x99ccff, transparent: true, opacity: 0.3,
+      blending: THREE.AdditiveBlending, depthWrite: false }),
+  );
+  systemGroup.add(head); systemGroup.add(tail);
+  let t = 0;
+  const DUR = 26;
+  const p01 = new THREE.Vector3(), p12 = new THREE.Vector3(), pos = new THREE.Vector3();
+  const away = new THREE.Vector3();
+  _fxList.push({
+    update(dt) {
+      t += dt;
+      const f = Math.min(1, t / DUR);
+      // quadratic bezier: deep space → near the star → deep space
+      p01.lerpVectors(start, ctrl, f);
+      p12.lerpVectors(ctrl, end, f);
+      pos.lerpVectors(p01, p12, f);
+      head.position.copy(pos);
+      const dist = pos.length();
+      away.copy(pos).normalize();
+      const len = Math.min(90, 14 + 2600 / (dist + 20));
+      tail.scale.set(1, len, 1);
+      tail.position.copy(pos).addScaledVector(away, len / 2);
+      tail.quaternion.setFromUnitVectors(_yAxis, away);
+      const fade = Math.min(1, Math.min(f, 1 - f) * 8);
+      tail.material.opacity = 0.3 * fade;
+      head.children[0].material.opacity = fade;
+      return t < DUR;
+    },
+    cleanup() {
+      _fxComet._active = false;
+      systemGroup?.remove(head); systemGroup?.remove(tail);
+      head.geometry.dispose(); head.material.dispose();
+      head.children[0]?.material.dispose();
+      tail.geometry.dispose(); tail.material.dispose();
+    },
+  });
+}
+
+// Orbital strike: beam lances down from a stationed weapon to the surface
+function _fxOrbitalStrike(planet) {
+  const orb = orbitals.find(o => o.type === 'weapon' && o.planet === planet && o.buildDoneAt === null);
+  AudioSys.beam();
+  const surface = new THREE.Vector3(planet.radius * 0.6, planet.radius * 0.25, planet.radius * 0.75)
+    .normalize().multiplyScalar(planet.radius);
+  if (orb?.mesh) {
+    const from = orb.mesh.position.clone();
+    const span = surface.clone().sub(from);
+    const len = span.length();
+    const beam = new THREE.Mesh(
+      new THREE.CylinderGeometry(planet.radius * 0.035, planet.radius * 0.012, len, 6, 1, true),
+      new THREE.MeshBasicMaterial({ color: 0xff6644, transparent: true, opacity: 0.9,
+        blending: THREE.AdditiveBlending, depthWrite: false }),
+    );
+    beam.position.copy(from).addScaledVector(span, 0.5);
+    beam.quaternion.setFromUnitVectors(_yAxis, span.normalize());
+    planet.planetNode.add(beam);
+    const core = beam.clone();
+    core.material = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.95,
+      blending: THREE.AdditiveBlending, depthWrite: false });
+    core.scale.set(0.4, 1, 0.4);
+    planet.planetNode.add(core);
+    let t = 0;
+    const DUR = 0.85;
+    _fxList.push({
+      update(dt) {
+        t += dt;
+        const flicker = 0.75 + 0.25 * Math.sin(performance.now() * 0.07);
+        beam.material.opacity = Math.max(0, 0.9 * (1 - t / DUR)) * flicker;
+        core.material.opacity = Math.max(0, 0.95 * (1 - t / DUR));
+        return t < DUR;
+      },
+      cleanup() {
+        planet.planetNode.remove(beam); planet.planetNode.remove(core);
+        beam.geometry.dispose(); beam.material.dispose(); core.material.dispose();
+      },
+    });
+  }
+  // impact flash at the surface point
+  const flash = _glowSprite(255, 120, 60, planet.radius * 1.1);
+  flash.position.copy(surface);
+  planet.planetNode.add(flash);
+  let ft = 0;
+  _fxList.push({
+    update(dt) {
+      ft += dt;
+      flash.material.opacity = Math.max(0, 1 - ft / 1.1);
+      flash.scale.setScalar(planet.radius * (1.1 + ft * 1.6));
+      return ft < 1.1;
+    },
+    cleanup() { planet.planetNode.remove(flash); flash.material.dispose(); },
+  });
+  _spawnExplosionFlash(planet);
+}
+
+// Event source → visual effect dispatcher (called with each tick's new entries)
+const _EVENT_FX = {
+  solar_flare:         c => _fxSolarFlare(),
+  meteor_strike:       c => _fxMeteor(c.planet),
+  nuclear_meltdown:    c => _fxNuke(c.planet),
+  mass_casualties:     c => _fxNuke(c.planet),
+  comet_flyby:         () => _fxComet(),
+  aurora_storm:        c => _fxAurora(c.planet),
+  mining_accident:     c => _spawnExplosionFlash(c.planet),
+  sabotage:            c => _spawnExplosionFlash(c.planet),
+  miner_terror_attack: c => _spawnExplosionFlash(c.planet),
+  kessler_syndrome:    c => _spawnExplosionFlash(c.planet),
+  orbital_strike_miners: c => _fxOrbitalStrike(c.planet),
+  orbital_strike_synths: c => _fxOrbitalStrike(c.planet),
+};
+
+function _triggerEventFX(entries, colony) {
+  for (const e of entries) {
+    if (e.speaker !== 'NEWS' || !e.source) continue;
+    _EVENT_FX[e.source]?.(colony);
   }
 }
 
@@ -2846,38 +4039,51 @@ function updateStructuresDisplay() {
   el.scrollTop = scrollTop;
 }
 
+const PLAYER_ACTION_CATS = [
+  ['workforce', 'Workforce'],
+  ['relations', 'Relations'],
+  ['synths',    'Synthetics'],
+  ['security',  'Security & Military'],
+];
+
 const PLAYER_ACTIONS = [   // defined after state vars; only called from UI handlers (not generateSystem)
-  { type: 'increase_work_hours',         label: 'Increase Work Hours',     cost: 0,   cd: 5,  desc: 'Upsets miners; pleases investors' },
-  { type: 'decrease_work_hours',         label: 'Decrease Work Hours',     cost: 0,   cd: 5,  desc: 'Helps miners; reduces output' },
-  { type: 'amenity_added',               label: 'Add Amenity',             cost: 200, cd: 10, desc: 'Significant morale boost' },
-  { type: 'miner_pay_increase',          label: 'Miner Pay Increase',      cost: 150, cd: 8,  desc: 'Happy miners; investors lose confidence' },
-  { type: 'benefits_cut',               label: 'Cut Benefits',            cost: 0,   cd: 8,  desc: 'Saves funds; risks radicalising workers' },
-  { type: 'safety_improvements',         label: 'Safety Improvements',     cost: 100, cd: 10, desc: 'Pleases government and miners' },
-  { type: 'colonial_representation',     label: 'Worker Representation',   cost: 0,   cd: 15, desc: 'Political goodwill; investors unhappy' },
-  { type: 'hire_more_workers',           label: 'Hire More Workers',       cost: 200, cd: 10, desc: 'Eases tension; reduces workload' },
-  { type: 'science_breakthrough',        label: 'Fund Research',           cost: 300, cd: 20, desc: 'Boosts government and investor confidence' },
-  { type: 'synths_deployed',             label: 'Deploy Synths',           cost: 250, cd: 25, desc: 'Synthetic labour; miners grow wary', prereq: 'synth_workshop' },
-  { type: 'remote_wipe',           label: 'Remote Wipe',          cost: 150, cd: 15,  desc: 'Broadcast memory-reset signal — knocks back organized/aware scores. Less effective each time as synths learn to shield themselves.', prereq_attr: 'synths_ever_deployed' },
-  { type: 'synth_hard_reset',      label: 'Synth Hard Reset',     cost: 300, cd: 40,  desc: 'Deploy army for direct neural overwrite — high chance of suppression, but failure grants autonomy. Requires army ≥ 10.', prereq_attr: 'synths_ever_deployed' },
-  { type: 'offer_synth_government',label: 'Recognise Synth Gov',  cost: 0,   cd: 999, desc: 'Formally recognise autonomous synths as colonial co-governors — stable 70% efficiency, but gov will be furious.', prereq_attr: 'synths_autonomous' },
-  { type: 'grant_synth_departure', label: 'Grant Departure',      cost: 0,   cd: 999, desc: 'Authorise synths to settle a free world — they leave peacefully but the colony loses its synthetic workforce.', prereq_attr: 'synth_emigration_petition' },
-  { type: 'refuse_synth_departure',label: 'Refuse Departure',     cost: 0,   cd: 999, desc: 'Deny the synth petition — they stay, but miners will see it and radicalize.', prereq_attr: 'synth_emigration_petition' },
-  { type: 'retake_synth_colony',  label: 'Retake Synth Colony',  cost: 0,   cd: 60,  desc: 'Send army to retake the synth settlement — success brings synths back suppressed, failure costs half your soldiers.', prereq_attr: 'synths_departed' },
-  { type: 'military_deployed',           label: 'Hire Security',           cost: 300, cd: 15, desc: 'Deters unrest; miners alarmed' },
-  { type: 'cooperate_with_investigation',label: 'Cooperate w/ Gov',        cost: 0,   cd: 10, desc: 'Reduces government suspicion' },
-  { type: 'human_rights_audit',          label: 'Human Rights Audit',      cost: 150, cd: 15, desc: 'Pleases government; nudges synths' },
-  { type: 'workforce_automation',        label: 'Automate Workforce',      cost: 400, cd: 20, desc: 'Pleases investors; strongly upsets miners' },
-  { type: 'bribe_government',           label: 'Bribe Officials',         cost: 400, cd: 20,  desc: 'Quietly reduces government suspicion' },
-  { type: 'crush_miners',               label: 'Crush Miners',            cost: 300, cd: 40,  desc: 'High-risk suppression — success locks workers, failure creates militia' },
-  { type: 'offer_local_government',     label: 'Recognise Government',    cost: 0,   cd: 999, desc: 'Recognise the militia as the colonial government — resolves standoff', prereq_attr: 'miners_militia' },
-  { type: 'train_army',                 label: 'Train Army',              cost: 150, cd: 8,   desc: 'Recruit and drill colonial armed forces (+5, max 50)' },
-  { type: 'deploy_army',                label: 'Deploy Army',             cost: 0,   cd: 0,   desc: 'Launch armed forces toward a target' },
+  // ── Workforce ──
+  { cat: 'workforce', type: 'increase_work_hours',     label: 'Increase Work Hours',   cost: 0,   cd: 5,  desc: 'Upsets miners; pleases investors' },
+  { cat: 'workforce', type: 'decrease_work_hours',     label: 'Decrease Work Hours',   cost: 0,   cd: 5,  desc: 'Helps miners; reduces output' },
+  { cat: 'workforce', type: 'amenity_added',           label: 'Add Amenity',           cost: 200, cd: 10, desc: 'Significant morale boost' },
+  { cat: 'workforce', type: 'miner_pay_increase',      label: 'Miner Pay Increase',    cost: 150, cd: 8,  desc: 'Happy miners; investors lose confidence' },
+  { cat: 'workforce', type: 'benefits_cut',            label: 'Cut Benefits',          cost: 0,   cd: 8,  desc: 'Saves funds; risks radicalising workers' },
+  { cat: 'workforce', type: 'safety_improvements',     label: 'Safety Improvements',   cost: 100, cd: 10, desc: 'Pleases government and miners' },
+  { cat: 'workforce', type: 'colonial_representation', label: 'Worker Representation', cost: 0,   cd: 15, desc: 'Political goodwill; investors unhappy' },
+  { cat: 'workforce', type: 'hire_more_workers',       label: 'Hire More Workers',     cost: 200, cd: 10, desc: 'Eases tension; reduces workload' },
+  { cat: 'workforce', type: 'workforce_automation',    label: 'Automate Workforce',    cost: 400, cd: 20, desc: 'Pleases investors; strongly upsets miners' },
+  // ── Relations ──
+  { cat: 'relations', type: 'science_breakthrough',        label: 'Fund Research',     cost: 300, cd: 20, desc: 'Boosts government and investor confidence' },
+  { cat: 'relations', type: 'cooperate_with_investigation',label: 'Cooperate w/ Gov',  cost: 0,   cd: 10, desc: 'Reduces government suspicion' },
+  { cat: 'relations', type: 'human_rights_audit',          label: 'Human Rights Audit',cost: 150, cd: 15, desc: 'Pleases government; nudges synths' },
+  { cat: 'relations', type: 'bribe_government',            label: 'Bribe Officials',   cost: 400, cd: 20, desc: 'Quietly reduces government suspicion' },
+  // ── Synthetics (situational entries hidden until relevant) ──
+  { cat: 'synths', type: 'synths_deployed',        label: 'Deploy Synths',        cost: 250, cd: 25,  desc: 'Synthetic labour; miners grow wary', prereq: 'synth_workshop' },
+  { cat: 'synths', type: 'remote_wipe',            label: 'Remote Wipe',          cost: 150, cd: 15,  desc: 'Broadcast memory-reset signal — knocks back organized/aware scores. Less effective each time as synths learn to shield themselves.', prereq_attr: 'synths_ever_deployed' },
+  { cat: 'synths', type: 'synth_hard_reset',       label: 'Synth Hard Reset',     cost: 300, cd: 40,  desc: 'Deploy army for direct neural overwrite — high chance of suppression, but failure grants autonomy. Requires army ≥ 10.', prereq_attr: 'synths_ever_deployed' },
+  { cat: 'synths', type: 'offer_synth_government', label: 'Recognise Synth Gov',  cost: 0,   cd: 999, desc: 'Formally recognise autonomous synths as colonial co-governors — stable 70% efficiency, but gov will be furious.', prereq_attr: 'synths_autonomous' },
+  { cat: 'synths', type: 'grant_synth_departure',  label: 'Grant Departure',      cost: 0,   cd: 999, desc: 'Authorise synths to settle a free world — they leave peacefully but the colony loses its synthetic workforce.', prereq_attr: 'synth_emigration_petition' },
+  { cat: 'synths', type: 'refuse_synth_departure', label: 'Refuse Departure',     cost: 0,   cd: 999, desc: 'Deny the synth petition — they stay, but miners will see it and radicalize.', prereq_attr: 'synth_emigration_petition' },
+  { cat: 'synths', type: 'retake_synth_colony',    label: 'Retake Synth Colony',  cost: 0,   cd: 60,  desc: 'Send army to retake the synth settlement — success brings synths back suppressed, failure costs half your soldiers.', prereq_attr: 'synths_departed' },
+  // ── Security & Military ──
+  { cat: 'security', type: 'military_deployed',      label: 'Hire Security',        cost: 300, cd: 15,  desc: 'Deters unrest; miners alarmed' },
+  { cat: 'security', type: 'train_army',             label: 'Train Army',           cost: 150, cd: 8,   desc: 'Recruit and drill colonial armed forces (+5, max 50)' },
+  { cat: 'security', type: 'deploy_army',            label: 'Deploy Army',          cost: 0,   cd: 0,   desc: 'Launch armed forces toward a target' },
+  { cat: 'security', type: 'crush_miners',           label: 'Crush Miners',         cost: 300, cd: 40,  desc: 'High-risk suppression — success locks workers, failure creates militia' },
+  { cat: 'security', type: 'orbital_bombardment',    label: 'Orbital Bombardment',  cost: 250, cd: 30,  desc: 'Fire the stationed orbital weapon at the colony — breaks militias, kills workers, horrifies everyone watching' },
+  { cat: 'security', type: 'offer_local_government', label: 'Recognise Government', cost: 0,   cd: 999, desc: 'Recognise the militia as the colonial government — resolves standoff', prereq_attr: 'miners_militia' },
 ];
 
 // Actions that remain available during a revolt — everything else is locked out.
 // Force: army actions. Diplomatic: concessions and recognition.
 const REVOLT_ALLOWED = new Set([
   'deploy_army','crush_miners','synth_hard_reset','retake_synth_colony','remote_wipe','military_deployed',
+  'orbital_bombardment',
   'offer_local_government','offer_synth_government','grant_synth_departure','refuse_synth_departure',
   'decrease_work_hours','miner_pay_increase','amenity_added','colonial_representation',
   'human_rights_audit','cooperate_with_investigation','safety_improvements','bribe_government',
@@ -2925,6 +4131,26 @@ const RANDOM_EVENTS = [
         }));
       }
     } },
+
+  { type: 'comet_flyby',
+    weight: 1, minTick: 12, cooldown: 40,
+    needs: { colony: true } },
+
+  { type: 'aurora_storm',
+    weight: 1.2, minTick: 8, cooldown: 30,
+    needs: { colony: true } },
+
+  { type: 'meteor_strike',
+    negative: true,
+    weight: 1.5, minTick: 10, cooldown: 25,
+    needs: { colony: true },
+    onFire: w => { w.attrs.miner_pop = Math.max(5, (w.attrs.miner_pop ?? 20) - 1); } },
+
+  { type: 'smuggler_ring',
+    negative: true,
+    weight: 1, minTick: 20, cooldown: 35,
+    needs: { colony: true, structure: 'mining_rig' },
+    onFire: () => { homeWorld.attrs.player_funds = (homeWorld.attrs.player_funds ?? 0) - 120; } },
 
   // ── Operational hazards (require colony + relevant structure) ──────────────
   { type: 'mining_accident',
@@ -3050,6 +4276,11 @@ const RANDOM_EVENTS = [
     onFire: w => { w.attrs.kessler_active = true; w.attrs.miner_pop = Math.max(5, (w.attrs.miner_pop ?? 20) - 5); } },
 ];
 
+// True when a completed orbital weapon is stationed at this planet
+function _orbitalWeaponAt(planet) {
+  return orbitals.some(o => o.type === 'weapon' && o.planet === planet && o.buildDoneAt === null);
+}
+
 // Control: 0–1. Governs how much negative events are dampened.
 // Factors: effective distance (reduced by transfer tech) + local security presence.
 function colonyControl(colony) {
@@ -3093,9 +4324,12 @@ function tickRandomEvents(colony) {
   colony.nextEventTick = tick + 6 + Math.floor(Math.random() * 7);
   if (!eligible.length) return;
 
-  const total = eligible.reduce((s, e) => s + e.weight, 0);
+  // Planet-type hazard bias: volcanic worlds have more accidents, toxic worlds more outbreaks, etc.
+  const bias = COLONY_TRAITS[colony.planet.type]?.bias ?? {};
+  const wOf = e => e.weight * (bias[e.type] ?? 1);
+  const total = eligible.reduce((s, e) => s + wOf(e), 0);
   let r = Math.random() * total;
-  const chosen = eligible.find(e => { r -= e.weight; return r <= 0; }) ?? eligible[eligible.length - 1];
+  const chosen = eligible.find(e => { r -= wOf(e); return r <= 0; }) ?? eligible[eligible.length - 1];
 
   fires[chosen.type] = (fires[chosen.type] ?? 0) + 1;
   if (chosen.cooldown !== undefined) cds[chosen.type] = tick + chosen.cooldown;
@@ -3272,6 +4506,41 @@ function firePlayerAction(action) {
   if (action.type === 'military_deployed') {
     w.attrs.security_level = Math.min(3, (w.attrs.security_level ?? 0) + 1);
   }
+  if (action.type === 'orbital_bombardment') {
+    if (!_orbitalWeaponAt(activeColony.planet)) return;
+    const killed = 4 + Math.floor(Math.random() * 4);
+    w.attrs.miner_pop = Math.max(0, (w.attrs.miner_pop ?? 20) - killed);
+    // 30% chance the barrage levels a non-core structure
+    const targets = Object.keys(w.attrs.structures ?? {})
+      .filter(id => !['mining_rig', 'transport_hub', 'comms_array'].includes(id));
+    let collateral = '';
+    if (targets.length && Math.random() < 0.30) {
+      const lost = targets[Math.floor(Math.random() * targets.length)];
+      delete w.attrs.structures[lost];
+      collateral = ` The ${STRUCTURES.find(s => s.id === lost)?.label ?? lost} is gone.`;
+    }
+    const mf = w.factions['miners'];
+    if (w.attrs.miners_militia && Math.random() < 0.65) {
+      w.attrs.miners_militia    = false;
+      w.attrs.miners_suppressed = true;
+      for (const d of mf.dispositions) mf.scores[d] = 0;
+      mf.scores['content'] = 1.0;
+      w.push(new NEvent('orbital_strike_miners', { source: 'player',
+        flavor: `ORBITAL STRIKE: kinetic rounds level the militia strongholds. ${killed} dead.${collateral} The uprising is broken from orbit. Nobody on the surface will forget the sound.`,
+      }));
+    } else {
+      w.push(new NEvent('orbital_strike_miners', { source: 'player',
+        flavor: `ORBITAL STRIKE: kinetic rounds hammer the colony. ${killed} dead.${collateral} Survivors emerge from the shelters with nothing left to lose.`,
+      }));
+    }
+    _fxOrbitalStrike(activeColony.planet);
+    _fxNuke(activeColony.planet);
+    tickRandomEvents(activeColony); _stepColony(activeColony); tickConstruction(activeColony);
+    _simTimeAccum = 0;
+    updateFundsDisplay(); if (_logVisible) updateColonyLog();
+    updateFactionDisplay(); updateActionsDisplay(); updateStructuresDisplay();
+    return;
+  }
   if (action.type === 'crush_miners') {
     const mf       = w.factions['miners'];
     const disp     = mf.disposition;
@@ -3283,7 +4552,10 @@ function firePlayerAction(action) {
     if (w.attrs.synths_ever_deployed)
       chance += (w.factions['synths'].disposition === 'free') ? -0.15 : 0.08;
     chance += (w.attrs.security_level ?? 0) * 0.10;
-    if (w.attrs.structures?.orbital_weapon) chance += 0.40;
+    if (_orbitalWeaponAt(activeColony.planet)) {
+      chance += 0.40;
+      _fxOrbitalStrike(activeColony.planet);   // the weapon fires in support
+    }
     chance = Math.max(0.05, Math.min(0.95, chance));
     const success = Math.random() < chance;
     if (success) {
@@ -3354,7 +4626,10 @@ function firePlayerAction(action) {
     const sf    = w.factions['synths'];
     const army  = w.attrs.army_size ?? 0;
     let chance  = 0.20 + (army / 50) * 0.50 + (w.attrs.security_level ?? 0) * 0.10;
-    if (w.attrs.structures?.orbital_weapon) chance += 0.30;
+    if (_orbitalWeaponAt(activeColony.planet)) {
+      chance += 0.30;
+      _fxOrbitalStrike(activeColony.planet);   // the weapon fires in support
+    }
     if (sf.disposition === 'free')      chance -= 0.20;
     if (sf.disposition === 'organized') chance -= 0.10;
     chance = Math.max(0.05, Math.min(0.90, chance));
@@ -3590,14 +4865,27 @@ function updateActionsDisplay() {
     el.appendChild(note);
   }
 
-  for (const a of PLAYER_ACTIONS) {
+  for (const [catId, catLabel] of PLAYER_ACTION_CATS) {
+    // Situational actions (prereq_attr) are hidden entirely until relevant —
+    // they only make sense as responses to specific colony states.
+    const group = PLAYER_ACTIONS.filter(a =>
+      a.cat === catId && (!a.prereq_attr || !!colonyWorld.attrs[a.prereq_attr]));
+    if (!group.length) continue;
+    const sub = document.createElement('div');
+    sub.style.cssText = 'font-size:9px;color:#667;text-transform:uppercase;letter-spacing:1.5px;padding:7px 0 2px';
+    sub.textContent = catLabel;
+    el.appendChild(sub);
+
+  for (const a of group) {
     const onCd        = (activeColony.playerCooldowns[a.type] ?? 0) > tick;
     const canAfford   = a.cost <= funds;
     const prereqMet   = !a.prereq      || !!(colonyWorld.attrs.structures?.[a.prereq]);
     const prereqAttr  = !a.prereq_attr || !!(colonyWorld.attrs[a.prereq_attr]);
     const crushBlocked      = a.type === 'crush_miners' &&
       (colonyWorld.attrs.miners_suppressed || colonyWorld.attrs.miners_militia);
-    const militiaBlocked    = colonyWorld.attrs.miners_militia && a.type !== 'offer_local_government';
+    const militiaBlocked    = colonyWorld.attrs.miners_militia &&
+      !['offer_local_government', 'orbital_bombardment'].includes(a.type);
+    const bombardBlocked    = a.type === 'orbital_bombardment' && !_orbitalWeaponAt(activeColony.planet);
     const deployBlocked     = a.type === 'deploy_army' && (colonyWorld.attrs.army_size ?? 0) < 1;
     const hardResetBlocked  = a.type === 'synth_hard_reset' && (colonyWorld.attrs.army_size ?? 0) < 10;
     const synthGovBlocked   = colonyWorld.attrs.synths_local_government &&
@@ -3610,7 +4898,7 @@ function updateActionsDisplay() {
     })();
     const revoltBlocked = inRevolt && !REVOLT_ALLOWED.has(a.type);
     const ok = !onCd && canAfford && prereqMet && prereqAttr &&
-      !crushBlocked && !militiaBlocked && !deployBlocked && !hardResetBlocked &&
+      !crushBlocked && !militiaBlocked && !deployBlocked && !hardResetBlocked && !bombardBlocked &&
       !synthGovBlocked && !departedBlocked && !retakeArmyBlocked && !revoltBlocked;
 
     const row = document.createElement('div');
@@ -3653,6 +4941,16 @@ function updateActionsDisplay() {
       const rem = (activeColony.playerCooldowns[a.type] ?? 0) - tick;
       desc.textContent = `cooldown: ${rem} tick${rem !== 1 ? 's' : ''}`;
       desc.style.color = '#889';
+    } else if (a.type === 'orbital_bombardment') {
+      if (bombardBlocked) {
+        desc.textContent = 'Requires an orbital weapon stationed at this colony (build at home, then assign it here)';
+        desc.style.color = '#667';
+      } else {
+        desc.textContent = colonyWorld.attrs.miners_militia
+          ? '65% chance to break the militia — kills workers, possible structure damage, government will be outraged'
+          : a.desc;
+        desc.style.color = ok ? '#e84' : '#667';
+      }
     } else if (a.type === 'train_army') {
       const sz = colonyWorld.attrs.army_size ?? 0;
       desc.textContent = `Army size: ${sz}/50 — ${a.desc}`;
@@ -3689,7 +4987,7 @@ function updateActionsDisplay() {
       } else {
         const sf = colonyWorld.factions['synths'];
         let chance = 0.20 + (army / 50) * 0.50 + (colonyWorld.attrs.security_level ?? 0) * 0.10;
-        if (colonyWorld.attrs.structures?.orbital_weapon) chance += 0.30;
+        if (_orbitalWeaponAt(activeColony.planet)) chance += 0.30;
         if (sf?.disposition === 'free')      chance -= 0.20;
         if (sf?.disposition === 'organized') chance -= 0.10;
         chance = Math.max(0.05, Math.min(0.90, chance));
@@ -3710,8 +5008,319 @@ function updateActionsDisplay() {
     row.appendChild(info);
     el.appendChild(row);
   }
+  }
   el.scrollTop = scrollTop;
 }
+
+// ── Event toasts ──────────────────────────────────────────────
+const _TOAST_GOOD = new Set([
+  'mission_success', 'structure_built', 'science_breakthrough', 'resource_vein_discovered',
+  'ancient_civilization_discovered', 'ancient_tech_recovered', 'first_human_child_born',
+  'miner_community_forms', 'disease_contained', 'transfer_tech_researched',
+  'alien_propulsion_integrated', 'government_policy_favorable', 'local_government_established',
+  'alien_bacteria_discovered', 'synths_granted_departure', 'synth_local_government',
+  'human_synth_hybrid_born', 'army_overthrow_success', 'army_crushes_militia',
+  'comet_flyby', 'aurora_storm',
+]);
+const _TOAST_WARN = new Set([
+  'miner_strike', 'media_expose', 'whistleblower_defects', 'disease_outbreak',
+  'mining_accident', 'resource_vein_depleted', 'solar_flare', 'government_policy_hostile',
+  'synths_refused_departure', 'remote_wipe', 'synths_become_sentient', 'synth_child_born',
+  'synths_petition_departure', 'colonial_independence_referendum', 'alien_warning_decoded',
+  'remnants_show_synthetic_beings', 'miners_crushed', 'synths_suppressed', 'rocket_lost',
+  'meteor_strike', 'smuggler_ring',
+]);
+const _TOAST_DANGER = new Set([
+  'nuclear_meltdown', 'kessler_syndrome', 'mass_casualties', 'miner_terror_attack',
+  'sabotage', 'crush_miners_failed', 'rocket_explosion', 'orbital_strike_miners',
+  'orbital_strike_synths', 'synth_autonomy', 'gov_sanctions', 'investor_funding_cut',
+  'alien_contamination', 'weapons_cache_miners', 'weapons_cache_synths',
+  'faction_conflict_escalating', 'miners_eliminate_synths_complete',
+  'synths_eliminate_miners_complete', 'colonial_militia_formed', 'synths_escape',
+  'human_rights_violation', 'synth_colony_attack_failed', 'army_overthrow_failed',
+  'army_crush_failed', 'army_lost',
+]);
+const _HOSTILE_DISPOSITIONS = new Set(['HOSTILE', 'REVOLUTIONARY', 'STRIKING', 'FREE', 'SUSPICIOUS', 'SKEPTICAL']);
+
+let _lastPingAt = 0;
+function showToast(srcLabel, message, severity = 'warn') {
+  const wrap = document.getElementById('toasts');
+  if (!wrap) return;
+  while (wrap.children.length >= 4) wrap.firstChild.remove();
+  const t = document.createElement('div');
+  t.className = `toast t-${severity}`;
+  const src = document.createElement('span');
+  src.className = 'toast-src';
+  src.textContent = `[${srcLabel}]`;
+  t.appendChild(src);
+  t.appendChild(document.createTextNode(
+    message.length > 180 ? message.slice(0, 177) + '…' : message));
+  wrap.appendChild(t);
+  setTimeout(() => { t.classList.add('t-out'); setTimeout(() => t.remove(), 600); }, 6500);
+  const now = performance.now();
+  if (now - _lastPingAt > 450) { _lastPingAt = now; AudioSys.ping(severity); }
+}
+
+function _emitToastsFor(entries, planetName, world = null) {
+  for (const e of entries) {
+    if (e.speaker !== 'NEWS' || !e.source) continue;
+    // Suppress synth news pre-reveal (mirrors the log panel rule)
+    if (world && !world.attrs.synths_ever_deployed && _SYNTH_SOURCES.has(e.source)) continue;
+    if (e.source.startsWith('shift:')) {
+      const toDisp = e.message.split('→').pop()?.trim() ?? '';
+      const sev = _HOSTILE_DISPOSITIONS.has(toDisp) ? 'danger' : 'good';
+      showToast(planetName, e.message, sev);
+    } else if (_TOAST_DANGER.has(e.source)) {
+      showToast(planetName, e.message, 'danger');
+    } else if (_TOAST_WARN.has(e.source)) {
+      showToast(planetName, e.message, 'warn');
+    } else if (_TOAST_GOOD.has(e.source)) {
+      showToast(planetName, e.message, 'good');
+    }
+  }
+}
+
+// ── Win / lose conditions ─────────────────────────────────────
+const WIN_FUNDS_TARGET   = 12000;
+const WIN_COLONY_TARGET  = 3;
+const WIN_POP_TARGET     = 90;
+const LOSE_SANCTION_CAP  = 5;
+const LOSE_BANKRUPT_AT   = -400;
+const TAKEOVER_TICKS     = 12;
+
+function _totalColonyPop() {
+  return colonies.reduce((s, c) => s + (c.world.attrs.miner_pop ?? 0), 0);
+}
+function _countStructures() {
+  return colonies.reduce((s, c) => s + Object.keys(c.world.attrs.structures ?? {}).length, 0);
+}
+
+function _checkEndConditions() {
+  if (_gameOver || _endgameSandbox || !homeWorld) return;
+  const funds = homeWorld.attrs.player_funds ?? 0;
+  const gov   = homeWorld.factions['gov'];
+  const inv   = homeWorld.factions['investors'];
+
+  // ── Final warning before charter revocation ──
+  // Must fire at 2 sanctions: the gov's revoke_license action unlocks at 2 and
+  // jumps straight to 5, so this is the last guaranteed-visible state before loss.
+  const sanc = gov.attrs.sanctions ?? 0;
+  if (sanc >= 2 && sanc < LOSE_SANCTION_CAP && !homeWorld.attrs._charterWarned && !homeWorld.attrs.gov_puppet) {
+    homeWorld.attrs._charterWarned = true;
+    showToast(homePlanet?.name ?? 'Home',
+      `CHARTER AT RISK: the Colonial Authority signals intent to revoke your operating license (sanctions ${sanc}/${LOSE_SANCTION_CAP}). Cooperate with investigations or bribe officials to de-escalate.`,
+      'danger');
+  }
+
+  // ── Defeats ──
+  if (funds <= LOSE_BANKRUPT_AT) {
+    return _showEndgame(false, 'BANKRUPTCY', 'corporate liquidation',
+      _buildEpilogue('bankrupt'));
+  }
+  if ((gov.attrs.sanctions ?? 0) >= LOSE_SANCTION_CAP && !homeWorld.attrs.gov_puppet) {
+    return _showEndgame(false, 'CHARTER REVOKED', 'colonial authority ruling',
+      _buildEpilogue('charter'));
+  }
+  if (inv.attrs.funding_level === 0 && inv.disposition === 'hostile') {
+    _takeoverCounter++;
+    if (_takeoverCounter >= TAKEOVER_TICKS) {
+      return _showEndgame(false, 'HOSTILE TAKEOVER', 'axiom capital communiqué',
+        _buildEpilogue('takeover'));
+    }
+  } else {
+    _takeoverCounter = 0;
+  }
+
+  // ── Victories (require at least one colony) ──
+  if (!colonies.length) return;
+  if (funds >= WIN_FUNDS_TARGET) {
+    return _showEndgame(true, 'INDUSTRIAL TITAN', 'shareholder report — final',
+      _buildEpilogue('titan'));
+  }
+  if (colonies.length >= WIN_COLONY_TARGET && _totalColonyPop() >= WIN_POP_TARGET) {
+    return _showEndgame(true, 'MASTER OF THE SYSTEM', 'colonial census bureau',
+      _buildEpilogue('master'));
+  }
+  for (const c of colonies) {
+    if (c.world.attrs.synths_local_government && (c.world.attrs.miner_synth_alliance ?? 0) >= 0.6) {
+      return _showEndgame(true, 'SYNTHESIS', 'joint declaration — all frequencies',
+        _buildEpilogue('synthesis', c));
+    }
+  }
+}
+
+function _colonyEpilogueLine(c) {
+  const w = c.world, n = c.planet.name;
+  if (w.attrs.miners_eliminated)        return `${n}: silent human districts. The synths keep the lights on, and keep the names.`;
+  if (w.attrs.synths_eliminated)        return `${n}: the dormitory murals were never painted over. Nobody talks about why.`;
+  if (w.attrs.planet_irradiated)        return `${n}: a radiological exclusion zone. The counters click for a thousand years.`;
+  if (w.attrs.kessler_active)           return `${n}: sealed beneath a cage of orbital debris. Nothing lands. Nothing leaves.`;
+  if (w.attrs.miners_militia)           return `${n}: flies its own flag now. The militia checkpoints don't honour company ID.`;
+  if (w.attrs.synths_local_government)  return `${n}: humans and synths co-sign the colony charter. It shouldn't work. It does.`;
+  if (w.attrs.local_government)         return `${n}: an elected colonial council governs. The company holds mining rights — for now.`;
+  if (w.attrs.miners_suppressed)        return `${n}: quiet, productive, obedient. The cameras never blink.`;
+  if ((w.attrs.miner_pop ?? 0) >= 40)   return `${n}: a true city now — schools, markets, a skyline of habitat domes.`;
+  return `${n}: a working colony of ${w.attrs.miner_pop ?? 0} souls, holding on at the edge of the dark.`;
+}
+
+function _synthEpilogueLine() {
+  let pop = 0, departed = 0, free = false;
+  for (const c of colonies) {
+    pop += c.world.factions['synths']?.attrs.population ?? 0;
+    departed += c.world.attrs.synth_colony_pop ?? 0;
+    if (c.world.factions['synths']?.disposition === 'free') free = true;
+  }
+  if (departed > 0) return `Somewhere out there, ${departed} synthetic settlers tend a world of their own. They still transmit, sometimes. They always sign off the same way: "We remember."`;
+  if (free)         return 'The synths no longer answer to anyone. Their last broadcast was not a threat. It was a goodbye.';
+  if (pop > 0)      return `${pop} synthetic units remain on the payroll. At night, the dormitory walls fill with engravings no one orders removed.`;
+  return null;
+}
+
+function _buildEpilogue(outcome, focusColony = null) {
+  const leads = {
+    bankrupt:  'The final transfer bounces. Dock fees, fuel contracts, payroll — all frozen. The colonies learn of the collapse from a news crawl eight light-minutes old.\nThe company that promised humanity the stars cannot afford the elevator down.',
+    charter:   'The gavel falls in a chamber you have never visited, on a world your colonists will never see again. License: revoked. Assets: sequestered. Personnel: recalled.\nThe Colonial Authority thanks you for your service to expansion.',
+    takeover:  "Axiom Capital's emergency motion is granted at 03:14 station time. By 03:20 your access codes are invalid.\nThe colonies wake to new management and a memo about 'continuity of operations.' Your name is already gone from the letterhead.",
+    titan:     'The quarterly report reads like fiction: revenue beyond projection, reserves beyond precedent. The board votes you a seat among the stars you sold.\nWhatever it cost out there in the dark — the ledger says it was worth it.',
+    master:    'Census day. Across the system, your colonies report in one by one — thousands of lives, light-minutes apart, all flying the same flag.\nThey came for wages. They stayed to build worlds. History will argue about whose victory this was.',
+    synthesis: 'The charter is signed twice: once in ink, once in a burst of encrypted light. Human and synthetic hands built this colony — now both govern it.\nThe galaxy has no precedent. The colony does not care. Work resumes at dawn, together.',
+  };
+  const parts = [leads[outcome] ?? ''];
+  if (colonies.length) {
+    parts.push(colonies.map(_colonyEpilogueLine).join('\n'));
+  } else {
+    parts.push('No colony ever broke ground. The system spins on, unmarked by human hands.');
+  }
+  const synthLine = _synthEpilogueLine();
+  if (synthLine) parts.push(synthLine);
+  if (homeWorld.attrs.gov_puppet) parts.push('On the homeworld, the "transitional administration" enters its fourth year. Nobody calls it a coup anymore. Nobody calls elections, either.');
+  return parts.join('\n\n');
+}
+
+function _showEndgame(win, title, kicker, epilogue) {
+  _gameOver = true;
+  paused = true;
+  updateSpeedUI();
+  if (win) AudioSys.victory(); else AudioSys.defeat();
+
+  document.getElementById('eg-kicker').textContent = kicker;
+  const titleEl = document.getElementById('eg-title');
+  titleEl.textContent = title;
+  titleEl.className = win ? 'eg-win' : 'eg-lose';
+  document.getElementById('eg-epilogue').textContent = epilogue;
+
+  const stats = [
+    [homeWorld.tick, 'ticks survived'],
+    ['₡' + Math.round(homeWorld.attrs.player_funds ?? 0).toLocaleString(), 'credits'],
+    [colonies.length, colonies.length === 1 ? 'colony' : 'colonies'],
+    [_totalColonyPop(), 'settlers'],
+    [_countStructures(), 'structures'],
+  ];
+  document.getElementById('eg-stats').innerHTML = stats.map(([v, k]) =>
+    `<div class="eg-stat"><div class="v">${v}</div><div class="k">${k}</div></div>`).join('');
+  document.getElementById('endgame').style.display = 'flex';
+}
+
+document.getElementById('eg-continue').addEventListener('click', () => {
+  document.getElementById('endgame').style.display = 'none';
+  _endgameSandbox = true;
+  _gameOver = false;
+  paused = false;
+  updateSpeedUI();
+});
+document.getElementById('eg-newgame').addEventListener('click', () => {
+  document.getElementById('endgame').style.display = 'none';
+  paused = false;
+  updateSpeedUI();
+  const seed = Math.floor(Math.random() * 999999);
+  document.getElementById('seed-input').value = seed;
+  generateSystem(seed, parseInt(document.getElementById('planet-count').value));
+});
+
+// ── Objectives / directives widget ────────────────────────────
+function _objStep(done, current, text) {
+  return `<div class="obj-step ${done ? 'done' : current ? 'current' : ''}">
+    <span class="obj-tick">${done ? '✓' : current ? '▸' : '·'}</span><span>${text}</span></div>`;
+}
+function _objBar(frac) {
+  return `<div class="obj-bar-wrap"><div class="obj-bar" style="width:${Math.min(100, frac * 100).toFixed(0)}%"></div></div>`;
+}
+
+function _updateObjectives() {
+  const panel = document.getElementById('objectives');
+  if (!panel) return;
+  panel.style.display = _objVisible ? '' : 'none';
+  if (!_objVisible) return;
+  const body = document.getElementById('obj-body');
+  if (_objCollapsed) { body.innerHTML = ''; return; }
+
+  if (_flightStates.length) _tut.transferred = true;
+
+  const launched    = !!homePlanet?.rocket || _tut.transferred || colonies.length > 0 || scheduledMissions.length > 0;
+  const transferred = _tut.transferred || colonies.length > 0;
+  const colonized   = colonies.length > 0;
+  const built       = colonies.some(c => Object.keys(c.world.attrs.structures ?? {}).length > 3
+                                      || Object.keys(c.world.attrs._construction ?? {}).length > 0);
+  const researched  = (homeWorld?.attrs.transfer_level ?? 0) >= 1 || !!homeWorld?.attrs._commsResearch;
+  const tutorialDone = launched && transferred && colonized && built && researched;
+
+  if (!tutorialDone) {
+    document.getElementById('obj-title').textContent = 'Getting Started';
+    const steps = [
+      [launched,    `Launch a rocket — open ${homePlanet?.name ?? 'HOME'} and build a satellite`],
+      [transferred, 'Plot an interplanetary transfer and launch at the window'],
+      [colonized,   'Establish a colony on a surveyed world'],
+      [built,       'Build a structure — supply rockets carry the materials'],
+      [researched,  'Research propulsion tech to escape transfer windows'],
+    ];
+    const idx = steps.findIndex(s => !s[0]);
+    body.innerHTML = steps.map((s, i) => _objStep(s[0], i === idx, s[1])).join('');
+    return;
+  }
+
+  // ── Directives mode: win/lose progress ──
+  document.getElementById('obj-title').textContent = 'Corporate Directives';
+  const funds = homeWorld.attrs.player_funds ?? 0;
+  const pop   = _totalColonyPop();
+  const gov   = homeWorld.factions['gov'];
+  const inv   = homeWorld.factions['investors'];
+  let html = '';
+
+  html += `<div class="obj-step current"><span class="obj-tick">◆</span><span>Industrial Titan — ₡${Math.max(0, Math.round(funds)).toLocaleString()} / ${WIN_FUNDS_TARGET.toLocaleString()}</span></div>`;
+  html += _objBar(funds / WIN_FUNDS_TARGET);
+  html += `<div class="obj-step current"><span class="obj-tick">◆</span><span>Master of the System — ${colonies.length}/${WIN_COLONY_TARGET} colonies · ${pop}/${WIN_POP_TARGET} settlers</span></div>`;
+  html += _objBar(Math.min(colonies.length / WIN_COLONY_TARGET, 1) * 0.5 + Math.min(pop / WIN_POP_TARGET, 1) * 0.5);
+
+  const synthCol = colonies.find(c => c.world.attrs.synths_ever_deployed);
+  if (synthCol) {
+    const sc = colonies.find(c => c.world.attrs.synths_local_government) ?? synthCol;
+    const al = sc.world.attrs.miner_synth_alliance ?? 0.5;
+    const hasGov = !!sc.world.attrs.synths_local_government;
+    html += `<div class="obj-step current"><span class="obj-tick">◆</span><span>Synthesis — ${hasGov ? '' : 'synth co-government + '}alliance ${Math.round(al * 100)}%/60%</span></div>`;
+    html += _objBar((hasGov ? 0.5 : 0) + Math.min(al / 0.6, 1) * 0.5);
+  }
+
+  const sanc = gov.attrs.sanctions ?? 0;
+  if (sanc > 0 && !homeWorld.attrs.gov_puppet)
+    html += `<div class="obj-step"><span class="obj-tick obj-warn">⚠</span><span class="obj-warn">Sanctions ${sanc}/${LOSE_SANCTION_CAP} — charter revoked at ${LOSE_SANCTION_CAP}</span></div>`;
+  if (inv.attrs.funding_level === 0)
+    html += `<div class="obj-step"><span class="obj-tick obj-warn">⚠</span><span class="obj-warn">Investors fully divested${inv.disposition === 'hostile' ? ` — takeover in ${Math.max(0, TAKEOVER_TICKS - _takeoverCounter)} ticks` : ''}</span></div>`;
+  if (funds < 0)
+    html += `<div class="obj-step"><span class="obj-tick obj-warn">⚠</span><span class="obj-warn">In debt — bankruptcy at ₡${LOSE_BANKRUPT_AT}</span></div>`;
+
+  body.innerHTML = html;
+}
+
+document.getElementById('btn-objectives').addEventListener('click', () => {
+  _objVisible = !_objVisible;
+  document.getElementById('btn-objectives').classList.toggle('active', _objVisible);
+  _updateObjectives();
+});
+document.getElementById('obj-min').addEventListener('click', () => {
+  _objCollapsed = !_objCollapsed;
+  document.getElementById('obj-min').textContent = _objCollapsed ? '+' : '−';
+  _updateObjectives();
+});
 
 // ── Colony UI helpers ─────────────────────────────────────────
 function showColonyControls() {
@@ -3738,10 +5347,10 @@ function _buildColonyRing(planet) {
 }
 
 document.getElementById('btn-slower').addEventListener('click', () => {
-  if (simSpeedIdx > 0) { simSpeedIdx--; simSpeed = SIM_SPEEDS[simSpeedIdx]; updateSpeedUI(); }
+  if (simSpeedIdx > 0) _userSetSpeed(simSpeedIdx - 1);
 });
 document.getElementById('btn-faster').addEventListener('click', () => {
-  if (simSpeedIdx < SIM_SPEEDS.length - 1) { simSpeedIdx++; simSpeed = SIM_SPEEDS[simSpeedIdx]; updateSpeedUI(); }
+  if (simSpeedIdx < SIM_SPEEDS.length - 1) _userSetSpeed(simSpeedIdx + 1);
 });
 document.getElementById('btn-pause').addEventListener('click', () => {
   paused = !paused;
@@ -3778,13 +5387,22 @@ function clearTransfer() {
     if (!f.mission) {
       if (f.flightMesh?.parent) f.flightMesh.parent.remove(f.flightMesh);
       if (f.rocket) f.rocket.frame.visible = true;
+      _removeTrajLine(f);
       _flightStates.splice(i, 1);
     }
   }
   _transferState = null;
+  _setAutoLaunch(false);
   if (_orbitWindowWasOpen) { _orbitWindowWasOpen = false; _onWindowClose(); }
   document.getElementById('op-transfer-info').style.display = 'none';
   document.getElementById('op-transfer-target').value = '';
+}
+
+function _setAutoLaunch(on) {
+  _autoLaunchArmed = on;
+  const cb = document.getElementById('op-xfer-auto');
+  if (cb) cb.checked = on;
+  document.getElementById('op-xfer-auto-wrap')?.classList.toggle('armed', on);
 }
 
 function drawTransfer(from, to) {
@@ -3819,7 +5437,8 @@ function drawTransfer(from, to) {
   // Target must be (π − ω₂·T) ahead of departure so it arrives at the rendezvous point
   const φ_req = ((Math.PI - to.speed * xferTime) % (2*Math.PI) + 2*Math.PI) % (2*Math.PI);
 
-  const mins = Math.floor(xferTime / 60), secs = Math.round(xferTime % 60);
+  const xferEff = xferTime * _xferProfile().timeMult;
+  const mins = Math.floor(xferEff / 60), secs = Math.round(xferEff % 60);
   document.getElementById('op-xfer-time').textContent    = mins > 0 ? `${mins}m ${secs}s` : `${secs}s`;
   document.getElementById('op-xfer-dv1').textContent     = dv1.toFixed(3) + ' Δv';
   document.getElementById('op-xfer-dv2').textContent     = dv2.toFixed(3) + ' Δv';
@@ -3836,20 +5455,27 @@ function drawTransfer(from, to) {
 function updateTransferArc() {
   if (!_transferState) return;
   const { from, to, a } = _transferState;
-  const r1 = from.orbitR, r2 = to.orbitR;
-  const c  = Math.abs(r2 - r1) / 2;
-  const b  = Math.sqrt(r1 * r2);
-  const outbound = r1 < r2;
-  const θ  = outbound ? from.angle : from.angle + Math.PI;
   const pos = _transferArc.geometry.attributes.position.array;
+  const prof = _xferProfile();
 
-  for (let i = 0; i <= 80; i++) {
-    const t  = outbound ? (i/80)*Math.PI : Math.PI + (i/80)*Math.PI;
-    const lx = a * Math.cos(t) - c;
-    const ly = b * Math.sin(t);
-    pos[i*3]   = lx * Math.cos(θ) - ly * Math.sin(θ);
-    pos[i*3+1] = 0;
-    pos[i*3+2] = lx * Math.sin(θ) + ly * Math.cos(θ);
+  if (prof.anytime) {
+    // preview the powered arc to the target's predicted arrival position
+    const { xferTime } = computeTransferWindow(from, to);
+    buildPoweredArc(from, to, xferTime * prof.timeMult, pos);
+  } else {
+    const r1 = from.orbitR, r2 = to.orbitR;
+    const c  = Math.abs(r2 - r1) / 2;
+    const b  = Math.sqrt(r1 * r2);
+    const outbound = r1 < r2;
+    const θ  = outbound ? from.angle : from.angle + Math.PI;
+    for (let i = 0; i <= 80; i++) {
+      const t  = outbound ? (i/80)*Math.PI : Math.PI + (i/80)*Math.PI;
+      const lx = a * Math.cos(t) - c;
+      const ly = b * Math.sin(t);
+      pos[i*3]   = lx * Math.cos(θ) - ly * Math.sin(θ);
+      pos[i*3+1] = 0;
+      pos[i*3+2] = lx * Math.sin(θ) + ly * Math.cos(θ);
+    }
   }
   _transferArc.geometry.attributes.position.needsUpdate = true;
   _transferArc.geometry.computeBoundingSphere();
@@ -3892,41 +5518,65 @@ function updateTransferAlignment() {
   const skipBtn  = document.getElementById('op-xfer-skip');
   const execBtn  = document.getElementById('op-xfer-execute');
   const costEl   = document.getElementById('op-xfer-cost');
-  const canAffordLaunch = (homeWorld?.attrs.player_funds ?? 0) >= ROCKET_LAUNCH_COST;
+  const prof     = _xferProfile();
+  // Advanced engines launch at any phase angle; off-window departures cost more
+  const effCost  = Math.round(ROCKET_LAUNCH_COST * (aligned ? 1 : prof.costMult));
+  const canAffordLaunch = (homeWorld?.attrs.player_funds ?? 0) >= effCost;
+  const premium  = prof.anytime && !aligned && prof.costMult > 1;
   if (costEl) {
-    costEl.textContent = '₡' + ROCKET_LAUNCH_COST.toLocaleString();
-    costEl.style.color = canAffordLaunch ? '#bbc' : '#f66';
+    costEl.textContent = '₡' + effCost.toLocaleString() + (premium ? ' (off-window)' : '');
+    costEl.style.color = !canAffordLaunch ? '#f66' : premium ? '#fc8' : '#bbc';
   }
+  const autoText = document.getElementById('op-xfer-auto-text');
+  if (autoText) autoText.textContent = prof.anytime
+    ? 'Auto-launch at optimal window (base cost)'
+    : 'Auto-launch when window opens';
+  const winEl = document.getElementById('op-xfer-window');
   if (aligned) {
-    document.getElementById('op-xfer-window').textContent = 'OPEN';
-    document.getElementById('op-xfer-window').style.color = '#4f8';
+    winEl.textContent = prof.anytime ? 'OPTIMAL — base cost' : 'OPEN';
+    winEl.style.color = '#4f8';
     skipBtn.disabled = true;
     skipBtn.style.opacity = '0.35';
-    execBtn.disabled = !canAffordLaunch;
-    execBtn.style.opacity = canAffordLaunch ? '1' : '0.35';
   } else {
     const wm = Math.floor(waitTime/60), ws = Math.round(waitTime%60);
-    document.getElementById('op-xfer-window').textContent = wm > 0 ? `~${wm}m ${ws}s` : `~${ws}s`;
-    document.getElementById('op-xfer-window').style.color = '#aac';
+    const eta = wm > 0 ? `~${wm}m ${ws}s` : `~${ws}s`;
+    winEl.textContent = prof.anytime ? `optimal in ${eta}` : eta;
+    winEl.style.color = prof.anytime ? '#cc9' : '#aac';
     skipBtn.disabled = false;
     skipBtn.style.opacity = '1';
-    execBtn.disabled = true;
-    execBtn.style.opacity = '0.35';
+  }
+  const canLaunch = (aligned || prof.anytime) && canAffordLaunch;
+  execBtn.disabled = !canLaunch;
+  execBtn.style.opacity = canLaunch ? '1' : '0.35';
+
+  if (prof.anytime) {
+    // no urgency at this tech level — never slow the sim or flash the banner
+    if (_orbitWindowWasOpen) { _orbitWindowWasOpen = false; _onWindowClose(); }
+  } else {
+    if (windowActive !== _orbitWindowWasOpen) {
+      _orbitWindowWasOpen = windowActive;
+      if (windowActive) _onWindowOpen();
+      else _onWindowClose();
+    }
+    if (windowActive) {
+      document.getElementById('launch-flash').textContent =
+        aligned ? (_autoLaunchArmed ? 'WINDOW OPEN — AUTO-LAUNCHING' : 'LAUNCH WINDOW OPEN — LAUNCH NOW')
+                : (_autoLaunchArmed ? 'AUTO-LAUNCH ARMED — WINDOW APPROACHING' : 'TRANSFER WINDOW OPENING — PREPARE TO LAUNCH');
+    }
   }
 
-  if (windowActive !== _orbitWindowWasOpen) {
-    _orbitWindowWasOpen = windowActive;
-    if (windowActive) {
-      _onWindowOpen();
-      document.getElementById('launch-flash').textContent =
-        aligned ? 'LAUNCH WINDOW OPEN — EXECUTE NOW' : 'TRANSFER WINDOW OPENING — PREPARE TO LAUNCH';
-    } else {
-      _onWindowClose();
-    }
-  } else if (windowActive) {
-    document.getElementById('launch-flash').textContent =
-      aligned ? 'LAUNCH WINDOW OPEN — EXECUTE NOW' : 'TRANSFER WINDOW OPENING — PREPARE TO LAUNCH';
+  // Never miss a window: while aligned, an armed transfer fires automatically
+  // (at any tech level — arming means "wait for the cheap optimal window");
+  // at level 0 an unarmed open window drops the sim to 1× so it can't blur past.
+  if (aligned && _autoLaunchArmed && canAffordLaunch && from.rocket) {
+    _setAutoLaunch(false);
+    executeTransfer();
+    return;
   }
+  if (aligned && !_transferState._wasAligned && simSpeedIdx > 3 && !prof.anytime) {
+    simSpeedIdx = 3; simSpeed = SIM_SPEEDS[3]; updateSpeedUI();
+  }
+  _transferState._wasAligned = aligned;
 }
 
 function skipToWindow() {
@@ -3964,6 +5614,40 @@ function computeTransferWindow(from, to) {
   return { aligned: errDeg < 4, waitTime, a, GM, xferTime };
 }
 
+// ── Transfer tech profiles (orbital layer) ────────────────
+// Level 0 is pure Hohmann: window-only. Higher propulsion tech launches at any
+// phase angle — off-window departures burn extra fuel (cost premium) and every
+// level shortens transit. Mirrors the narrative TRANSFER_LEVELS flavor.
+const TRANSFER_PROFILES = [
+  { anytime: false, costMult: 1.0,  timeMult: 1.0  },   // Hohmann Transfer
+  { anytime: true,  costMult: 1.75, timeMult: 0.9  },   // Reserve Burns
+  { anytime: true,  costMult: 1.4,  timeMult: 0.65 },   // Ion Drives
+  { anytime: true,  costMult: 1.15, timeMult: 0.45 },   // Alien Propulsion
+  { anytime: true,  costMult: 1.0,  timeMult: 0.25 },   // Quantum Relay
+];
+function _xferProfile() {
+  return TRANSFER_PROFILES[homeWorld?.attrs.transfer_level ?? 0];
+}
+
+// Powered transfer arc: sweeps prograde from the departure planet's position to
+// where the target will be at arrival — works from any phase angle.
+function buildPoweredArc(from, to, xferTime, out = null) {
+  const r1 = from.orbitR, r2 = to.orbitR;
+  const th1 = from.angle;
+  const th2 = to.angle + to.speed * xferTime;     // target position at arrival
+  const dth = ((th2 - th1) % (2*Math.PI) + 2*Math.PI) % (2*Math.PI);
+  const arr = out ?? new Float32Array(81 * 3);
+  const bulge = Math.min(r1, r2) * 0.14;
+  for (let i = 0; i <= 80; i++) {
+    const t = i / 80;
+    const s = t * t * (3 - 2 * t);                // ease the radius change
+    const ang = th1 + dth * t;
+    const rad = r1 + (r2 - r1) * s + Math.sin(Math.PI * t) * bulge;
+    arr[i*3] = Math.cos(ang) * rad; arr[i*3+1] = 0; arr[i*3+2] = Math.sin(ang) * rad;
+  }
+  return arr;
+}
+
 // ── Mission scheduler ─────────────────────────────────────
 function scheduleMission(to, count) {
   scheduledMissions.push({ id: ++_missionId, from: homePlanet, to, remaining: count, total: count, status: 'waiting' });
@@ -3990,6 +5674,7 @@ function updateMissionListUI() {
   el.innerHTML = scheduledMissions.map(m => {
     const win = m.status === 'waiting' ? computeTransferWindow(m.from, m.to) : null;
     const winStr = m.status === 'in-flight' ? '<span style="color:#4af">in transit</span>'
+      : _xferProfile().anytime ? '<span style="color:#4f8">departing</span>'
       : win?.aligned ? '<span style="color:#4f8">OPEN</span>'
       : (() => { const s = Math.round(win.waitTime); const mn = Math.floor(s/60); return `<span style="color:#aab">~${mn>0?mn+'m ':''}${s%60}s</span>`; })();
     const destLabel = m.label ? `${m.to.name} [${m.label}]` : m.to.name;
@@ -4005,9 +5690,28 @@ function updateMissionListUI() {
 function _attachPlume(from, flightMesh, snapshotArc) {
   const plume = buildPlume(from.radius * 1.5);
   flightMesh.add(plume);
+  AudioSys.launch();
   const dx = snapshotArc[3] - snapshotArc[0], dz = snapshotArc[5] - snapshotArc[2];
   const dl = Math.sqrt(dx*dx + dz*dz) || 1;
   return { plume, progX: dx/dl, progZ: dz/dl, exhaustSpeed: from.radius * 11 };
+}
+
+// Trajectory line shown for the full duration of a flight
+function _makeTrajLine(snapshotArc) {
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.BufferAttribute(snapshotArc.slice(), 3));
+  const line = new THREE.Line(geo, new THREE.LineBasicMaterial({
+    color: 0x44ddff, transparent: true, opacity: 0.4,
+  }));
+  systemGroup.add(line);
+  return line;
+}
+function _removeTrajLine(f) {
+  if (!f.trajLine) return;
+  f.trajLine.parent?.remove(f.trajLine);
+  f.trajLine.geometry.dispose();
+  f.trajLine.material.dispose();
+  f.trajLine = null;
 }
 
 function launchScheduledRocket(mission, idx = 0) {
@@ -4023,16 +5727,24 @@ function launchScheduledRocket(mission, idx = 0) {
 
   const r1 = from.orbitR, r2 = to.orbitR;
   const outbound = r1 < r2;
-  const { a, GM, xferTime } = computeTransferWindow(from, to);
-  const c_ = Math.abs(r2 - r1) / 2, b_ = Math.sqrt(r1 * r2);
-  const θ = outbound ? from.angle : from.angle + Math.PI;
-  const snapshotArc = new Float32Array(81 * 3);
-  for (let i = 0; i <= 80; i++) {
-    const t  = outbound ? (i/80)*Math.PI : Math.PI + (i/80)*Math.PI;
-    const lx = a * Math.cos(t) - c_, ly = b_ * Math.sin(t);
-    snapshotArc[i*3]   = lx * Math.cos(θ) - ly * Math.sin(θ);
-    snapshotArc[i*3+1] = 0;
-    snapshotArc[i*3+2] = lx * Math.sin(θ) + ly * Math.cos(θ);
+  const prof = _xferProfile();
+  const { a, xferTime: tHohmann } = computeTransferWindow(from, to);
+  const xferTime = tHohmann * prof.timeMult;
+  let snapshotArc;
+  if (prof.anytime) {
+    // advanced engines fly a powered arc to the target's predicted position
+    snapshotArc = buildPoweredArc(from, to, xferTime);
+  } else {
+    const c_ = Math.abs(r2 - r1) / 2, b_ = Math.sqrt(r1 * r2);
+    const θ = outbound ? from.angle : from.angle + Math.PI;
+    snapshotArc = new Float32Array(81 * 3);
+    for (let i = 0; i <= 80; i++) {
+      const t  = outbound ? (i/80)*Math.PI : Math.PI + (i/80)*Math.PI;
+      const lx = a * Math.cos(t) - c_, ly = b_ * Math.sin(t);
+      snapshotArc[i*3]   = lx * Math.cos(θ) - ly * Math.sin(θ);
+      snapshotArc[i*3+1] = 0;
+      snapshotArc[i*3+2] = lx * Math.sin(θ) + ly * Math.cos(θ);
+    }
   }
 
   const flightMesh = r.mesh.clone();
@@ -4051,10 +5763,26 @@ function launchScheduledRocket(mission, idx = 0) {
     capturePer: to.radius * (3 + idx * 0.4),   // spread arrival orbits
     captureE0: 0.85,
     plume, progX, progZ, exhaustSpeed,
+    trajLine: _makeTrajLine(snapshotArc),
   });
 }
 
 function checkScheduledMissions() {
+  // With anytime propulsion, queued missions depart immediately — no waiting,
+  // no window banner, no sim slowdown.
+  if (_xferProfile().anytime) {
+    if (_missionWindowWasOpen) { _missionWindowWasOpen = false; _onWindowClose(); }
+    for (const m of scheduledMissions) {
+      if (m.status !== 'waiting' || m.remaining <= 0) continue;
+      const count = m.remaining;
+      m.status = 'in-flight';
+      for (let i = 0; i < count; i++) launchScheduledRocket(m, i);
+      updateMissionListUI();
+      return;
+    }
+    return;
+  }
+
   let anyApproaching = false;
   let anyAligned = false;
   for (const m of scheduledMissions) {
@@ -4092,18 +5820,28 @@ function checkScheduledMissions() {
 
 function executeTransfer() {
   if (!_transferState) return;
-  const { from, to, a, GM } = _transferState;
+  const { from, to } = _transferState;
   const r = from.rocket;
   if (!r) return;
-  if (!homeWorld || (homeWorld.attrs.player_funds ?? 0) < ROCKET_LAUNCH_COST) return;
-  homeWorld.attrs.player_funds = (homeWorld.attrs.player_funds ?? 0) - ROCKET_LAUNCH_COST;
+  const prof = _xferProfile();
+  const { aligned, xferTime: tHohmann } = computeTransferWindow(from, to);
+  if (!aligned && !prof.anytime) return;   // level 0 must launch in the window
+  // Off-window departures with advanced engines burn extra fuel
+  const cost = Math.round(ROCKET_LAUNCH_COST * (aligned ? 1 : prof.costMult));
+  if (!homeWorld || (homeWorld.attrs.player_funds ?? 0) < cost) return;
+  homeWorld.attrs.player_funds = (homeWorld.attrs.player_funds ?? 0) - cost;
   updateFundsDisplay();
 
-  const xferTime = Math.PI * Math.sqrt(a * a * a / GM);
+  const xferTime = tHohmann * prof.timeMult;
 
   // Snapshot arc geometry at departure so the path stays fixed during flight
-  updateTransferArc();
-  const snapshotArc = new Float32Array(_transferArc.geometry.attributes.position.array);
+  let snapshotArc;
+  if (prof.anytime) {
+    snapshotArc = buildPoweredArc(from, to, xferTime);
+  } else {
+    updateTransferArc();
+    snapshotArc = new Float32Array(_transferArc.geometry.attributes.position.array);
+  }
   _transferArc.visible = false;   // hide the live-rotating version during flight
 
   // Clone rocket mesh for the in-flight visual; hide the original orbit frame
@@ -4130,6 +5868,7 @@ function executeTransfer() {
     capturePer: to.radius * 3,
     captureE0: 0.85,
     plume, progX, progZ, exhaustSpeed,
+    trajLine: _makeTrajLine(snapshotArc),
   });
 }
 
@@ -4171,6 +5910,7 @@ function tickFlight(f, dt) {
     if (t >= 1) {
       systemGroup.remove(f.flightMesh);
       f.flightMesh = null;
+      _removeTrajLine(f);
       if (f.mission?.constructionPayload) {
         _deliverConstructionPayload(f);
       } else {
@@ -4344,278 +6084,7 @@ function _finalizeCapture(f) {
   }
 }
 
-// State-vector → Keplerian elements in the game's YXZ-Euler parametrisation
-function stateToElements(px, py, pz, vxW, vyW, vzW, GM) {
-  const r = Math.sqrt(px*px + py*py + pz*pz);
-  if (r < 1e-9) return null;
-  const v2 = vxW*vxW + vyW*vyW + vzW*vzW;
-  const hx = py*vzW - pz*vyW;
-  const hy = pz*vxW - px*vzW;
-  const hz = px*vyW - py*vxW;
-  const h = Math.sqrt(hx*hx + hy*hy + hz*hz);
-  if (h < 1e-9) return null;
-  const eps = v2/2 - GM/r;
-  const a = (Math.abs(eps) > 1e-12) ? -GM/(2*eps) : 1e9;
-  const rdotv = px*vxW + py*vyW + pz*vzW;
-  const ex = ((v2 - GM/r)*px - rdotv*vxW) / GM;
-  const ey = ((v2 - GM/r)*py - rdotv*vyW) / GM;
-  const ez = ((v2 - GM/r)*pz - rdotv*vzW) / GM;
-  const e = Math.sqrt(ex*ex + ey*ey + ez*ez);
-  const cosInc = -hy / h;
-  const sinIncSq = Math.max(0, 1 - cosInc*cosInc);
-  // argPeri from angular momentum vector (valid when inclined); fall back to e-vec for equatorial
-  const argPeri = sinIncSq > 0.001
-    ? Math.atan2(-hx, -hz)
-    : (e > 1e-6 ? Math.atan2(-ez, ex) : 0);
-  let sinInc = 0;
-  if (sinIncSq > 0.001) {
-    const ca = Math.cos(argPeri), sa = Math.sin(argPeri);
-    sinInc = Math.abs(ca) >= Math.abs(sa) ? -hz/(h*ca) : -hx/(h*sa);
-  } else {
-    sinInc = 0;
-  }
-  const inc = Math.atan2(sinInc, cosInc);
-  return { a, e, inclination: inc, argPeri };
-}
-
-// World-space velocity of a planet's centre (tangential, accounts for tiltGroup rotation)
-const _q_tmp = new THREE.Quaternion();
-function getBodyVel(planet) {
-  const spd = planet.speed * planet.orbitR;
-  const lv = new THREE.Vector3(-Math.sin(planet.angle)*spd, 0, Math.cos(planet.angle)*spd);
-  planet.tiltGroup.getWorldQuaternion(_q_tmp);
-  lv.applyQuaternion(_q_tmp);
-  return lv;
-}
-
-// World-space velocity of a rocket (orbital vel rotated to world + parent planet vel)
-function getRocketWorldVel(r, parentPlanet) {
-  const lv = new THREE.Vector3(
-    -r.a * Math.sin(r.angle) * r.speed,
-    0,
-    r.b * Math.cos(r.angle) * r.speed,
-  );
-  r.frame.updateWorldMatrix(true, false);
-  r.frame.getWorldQuaternion(_q_tmp);
-  lv.applyQuaternion(_q_tmp);
-  lv.add(getBodyVel(parentPlanet));
-  return lv;
-}
-
-// Rebuild the orange osculating orbit ring relative to nearBody and update panel SOI section.
-// Called every 6 animation frames when the orbit panel is open.
-function refreshOsculatingRing(r, parentPlanet) {
-  clearOsculating();
-
-  // Find nearest other planet
-  let nearBody = null, nearDist = Infinity;
-  const rPos = r.worldPos;
-  const _nb_tmp = new THREE.Vector3();
-  for (const p of planets) {
-    if (p === parentPlanet) continue;
-    p.mesh.getWorldPosition(_nb_tmp);
-    const d = _nb_tmp.distanceTo(rPos);
-    if (d < nearDist) { nearDist = d; nearBody = p; }
-  }
-  r.nearBody = nearBody;
-  r.nearDist = nearDist;
-
-  const soiSection = document.getElementById('op-soi-section');
-  if (!nearBody || nearDist > nearBody.soiRadius * 3) {
-    r.osculatingElements = null;
-    soiSection.style.display = 'none';
-    return;
-  }
-
-  // State vectors relative to nearBody
-  const nbPos = new THREE.Vector3();
-  nearBody.mesh.getWorldPosition(nbPos);
-  const px = rPos.x - nbPos.x, py = rPos.y - nbPos.y, pz = rPos.z - nbPos.z;
-  const rVel = getRocketWorldVel(r, parentPlanet);
-  const nbVel = getBodyVel(nearBody);
-  const vx = rVel.x - nbVel.x, vy = rVel.y - nbVel.y, vz = rVel.z - nbVel.z;
-
-  const el = stateToElements(px, py, pz, vx, vy, vz, nearBody.GM);
-  if (!el) { r.osculatingElements = null; soiSection.style.display = 'none'; return; }
-  r.osculatingElements = el;
-
-  // Build orange ring
-  _osculatingGroup = new THREE.Group();
-  _osculatingGroup.position.copy(nbPos);
-  _osculatingGroup.rotation.order = 'YXZ';
-  _osculatingGroup.rotation.y = el.argPeri;
-  _osculatingGroup.rotation.x = el.inclination;
-
-  const pts = [];
-  const p_sl = Math.abs(el.a * (1 - el.e * el.e));  // semi-latus rectum (positive for both cases)
-  if (el.e < 1 && el.a > 0) {
-    // Elliptic: full ring
-    const b = el.a * Math.sqrt(1 - el.e * el.e), c = el.a * el.e;
-    for (let i = 0; i <= 128; i++) {
-      const t = (i / 128) * Math.PI * 2;
-      pts.push(new THREE.Vector3(el.a * Math.cos(t) - c, 0, b * Math.sin(t)));
-    }
-  } else {
-    // Hyperbolic arc — sweep from -nuMax to +nuMax around periapsis
-    const nuMax = Math.min(2.4, Math.acos(-1 / el.e) - 0.05);
-    for (let i = 0; i <= 80; i++) {
-      const nu = -nuMax + (i / 80) * 2 * nuMax;
-      const rad = p_sl / (1 + el.e * Math.cos(nu));
-      pts.push(new THREE.Vector3(rad * Math.cos(nu), 0, rad * Math.sin(nu)));
-    }
-  }
-  _osculatingGroup.add(new THREE.Line(
-    new THREE.BufferGeometry().setFromPoints(pts),
-    new THREE.LineBasicMaterial({ color: 0xffaa00, transparent: true, opacity: 0.72 }),
-  ));
-  scene.add(_osculatingGroup);
-
-  updateOrbitPanel();
-}
-
-function showPreviewOrbit(a, e, inc, arg) {
-  clearPreview();
-  if (!_activePlanet) return;
-  const b = a * Math.sqrt(1 - e * e), c = a * e;
-  const pts = [];
-  for (let i = 0; i <= 128; i++) {
-    const t = (i / 128) * Math.PI * 2;
-    pts.push(new THREE.Vector3(a * Math.cos(t) - c, 0, b * Math.sin(t)));
-  }
-  const ring = new THREE.Line(
-    new THREE.BufferGeometry().setFromPoints(pts),
-    new THREE.LineBasicMaterial({ color: 0xff3300, transparent: true, opacity: 0.80 }),
-  );
-  _previewGroup = new THREE.Group();
-  _previewGroup.rotation.order = 'YXZ';
-  _previewGroup.rotation.y = arg;
-  _previewGroup.rotation.x = inc;
-  _previewGroup.add(ring);
-  _activePlanet.planetNode.add(_previewGroup);
-}
-
-// ── Maneuver delta-V calculator ───────────────────────────
-function computeManeuverDv(r, a2, e2, inc2, arg2) {
-  const {GM, a: a1, e: e1, inclination: inc1, argPeri: arg1, planetRadius: pR} = r;
-  e2 = Math.min(Math.max(0, e2), Math.max(0, 1 - pR * 1.15 / a2));
-
-  const vv = (rPt, a) => {
-    const v2 = GM * (2 / rPt - 1 / a);
-    return v2 > 0 ? Math.sqrt(v2) : 0;
-  };
-
-  const per1 = a1*(1-e1), apo1 = a1*(1+e1);
-  const per2 = a2*(1-e2), apo2 = a2*(1+e2);
-
-  // Two-burn Hohmann transfers: try per1→apo2 and apo1→per2, take minimum
-  let dvOrbit = Infinity;
-  for (const [rA, rB, aFrom, aTo] of [
-    [per1, apo2, a1, a2],
-    [apo1, per2, a1, a2],
-  ]) {
-    if (rA <= 0 || rB <= 0 || rA === rB) continue;
-    const rLo = Math.min(rA, rB), rHi = Math.max(rA, rB);
-    const at = (rLo + rHi) / 2;
-    const dv = Math.abs(vv(rA, at) - vv(rA, aFrom))
-             + Math.abs(vv(rB, aTo) - vv(rB, at));
-    if (isFinite(dv)) dvOrbit = Math.min(dvOrbit, dv);
-  }
-  if (!isFinite(dvOrbit)) dvOrbit = Math.abs(Math.sqrt(GM/a2) - Math.sqrt(GM/a1));
-
-  // Plane change at apoapsis of target orbit (slowest point = cheapest)
-  const dvPlane = 2 * vv(apo2, a2) * Math.abs(Math.sin((inc2 - inc1) / 2));
-
-  // Argument-of-periapsis rotation (scales with eccentricity, free for circles)
-  let dArg = ((arg2 - arg1) % (2*Math.PI) + 2*Math.PI) % (2*Math.PI);
-  if (dArg > Math.PI) dArg = 2*Math.PI - dArg;
-  const dvArg = Math.sqrt(GM / a2) * 2 * Math.sin(dArg / 2) * ((e1 + e2) / 2);
-
-  return dvOrbit + dvPlane + dvArg;
-}
-
-// ── Orbit panel open / live-update ────────────────────────
-function _syncEccMax(a, pR) {
-  const sl = document.getElementById('sl-ecc');
-  const eMax = Math.min(0.97, Math.max(0, 1 - pR * 1.15 / a)).toFixed(3);
-  sl.max = eMax;
-  if (parseFloat(sl.value) > parseFloat(eMax)) sl.value = eMax;
-}
-
-function updateOrbitPanel() {
-  if (!_activePlanet) return;
-  const r = _activePlanet.rocket;
-
-  const a2   = parseFloat(document.getElementById('sl-sma').value);
-  _syncEccMax(a2, r.planetRadius);
-  const e2   = parseFloat(document.getElementById('sl-ecc').value);
-  const inc2 = parseFloat(document.getElementById('sl-inc').value) * Math.PI / 180;
-  const arg2 = parseFloat(document.getElementById('sl-arg').value) * Math.PI / 180;
-
-  // Clamp e2 for derived calcs
-  const e2c = Math.min(e2, parseFloat(document.getElementById('sl-ecc').max));
-
-  document.getElementById('op-sma-val').textContent = a2.toFixed(2) + ' u';
-  document.getElementById('op-ecc-val').textContent = e2c.toFixed(4);
-  document.getElementById('op-inc-val').textContent = (inc2 * 180/Math.PI).toFixed(2) + '°';
-  document.getElementById('op-arg-val').textContent = (arg2 * 180/Math.PI).toFixed(2) + '°';
-
-  document.getElementById('op-apo-new').textContent = (a2*(1+e2c) - r.planetRadius).toFixed(2) + ' u';
-  document.getElementById('op-per-new').textContent = (a2*(1-e2c) - r.planetRadius).toFixed(2) + ' u';
-
-  const cost      = computeManeuverDv(r, a2, e2c, inc2, arg2);
-  const remaining = r.deltav - r.usedDV;
-  const canAfford = cost <= remaining + 1e-9;
-
-  document.getElementById('op-cost').textContent   = cost.toFixed(3) + ' Δv';
-  document.getElementById('op-cost').style.color   = canAfford ? '#4af' : '#f55';
-  document.getElementById('op-budget').textContent = remaining.toFixed(3) + ' / ' + r.deltav.toFixed(3) + ' Δv';
-
-  const usedFrac = Math.min(1, r.usedDV / r.deltav);
-  const costFrac = Math.min(1 - usedFrac, cost / r.deltav);
-  document.getElementById('op-bar-used').style.width = (usedFrac * 100).toFixed(1) + '%';
-  document.getElementById('op-bar-cost').style.width = (costFrac * 100).toFixed(1) + '%';
-
-  const btn = document.getElementById('op-execute');
-  btn.disabled = !canAfford;
-  btn.style.opacity = canAfford ? '1' : '0.35';
-
-  if (cost > 1e-4) showPreviewOrbit(a2, e2c, inc2, arg2);
-  else clearPreview();
-
-  // ── SOI section ───────────────────────────────────────────
-  const soiSection = document.getElementById('op-soi-section');
-  const el = r.osculatingElements;
-  const nb = r.nearBody;
-  if (!nb || !el) { soiSection.style.display = 'none'; return; }
-
-  soiSection.style.display = 'block';
-  document.getElementById('op-soi-name').textContent = nb.name;
-  document.getElementById('op-soi-dist').textContent =
-    r.nearDist.toFixed(1) + ' u (SOI ' + nb.soiRadius.toFixed(1) + ')';
-  document.getElementById('op-soi-ecc').textContent = el.e.toFixed(4);
-
-  const bound = el.e < 1 && el.a > 0;
-  const rPer = bound ? el.a * (1 - el.e) : Math.abs(el.a) * (el.e - 1);
-  document.getElementById('op-soi-per').textContent = (rPer - nb.radius).toFixed(2) + ' u';
-
-  const apoRow = document.getElementById('op-soi-apo-row');
-  apoRow.style.display = bound ? '' : 'none';
-  if (bound) document.getElementById('op-soi-apo').textContent = (el.a*(1+el.e) - nb.radius).toFixed(2) + ' u';
-
-  const vPer   = rPer > 1e-6 ? Math.sqrt(nb.GM * (2/rPer - 1/el.a)) : 0;
-  const vCirc  = rPer > 1e-6 ? Math.sqrt(nb.GM / rPer) : 0;
-  const capDV  = Math.abs(vPer - vCirc);
-  const capEl  = document.getElementById('op-soi-capv');
-  capEl.textContent = capDV.toFixed(3) + ' Δv';
-
-  const remBudget  = r.deltav - r.usedDV;
-  const canCapture = capDV <= remBudget + 1e-9 && rPer > nb.radius * 1.05;
-  const capBtn = document.getElementById('op-capture');
-  capBtn.disabled = !canCapture;
-  capBtn.style.opacity = canCapture ? '1' : '0.35';
-  capEl.style.color = canCapture ? '#4af' : '#f55';
-}
-
+// ── Orbit panel ───────────────────────────────────────────
 function openOrbitPanel(planet) {
   const foundColony = colonies.find(c => c.planet === planet) ?? null;
   if (!planet.rocket && planet !== homePlanet && !foundColony) return;
@@ -4635,9 +6104,27 @@ function openOrbitPanel(planet) {
 
   // Colony section: visible on non-home planets (whether or not they have a rocket now)
   const colonySection = document.getElementById('op-colony-section');
+  const isGas = planet.type === 'gas';
   colonySection.style.display = (!isHome) ? 'block' : 'none';
   document.getElementById('op-colony-established').style.display = isColony ? 'block' : 'none';
-  document.getElementById('op-colony-establish').style.display = (hasRocket && !isHome && !foundColony) ? 'block' : 'none';
+  document.getElementById('op-colony-establish').style.display = (hasRocket && !isHome && !foundColony && !isGas) ? 'block' : 'none';
+
+  // Survey readout — shown before a colony exists on any non-home planet
+  const surveyEl = document.getElementById('op-survey');
+  if (!isHome && !isColony) {
+    const tr = COLONY_TRAITS[planet.type] ?? COLONY_TRAITS.rock;
+    surveyEl.style.display = 'block';
+    surveyEl.innerHTML = `
+      <div style="font-size:10px;color:#889;text-transform:uppercase;letter-spacing:1px;margin-bottom:4px">Orbital Survey — ${planet.label}</div>
+      <div style="font-size:11px;color:#aab;line-height:1.5;margin-bottom:5px">${tr.blurb}</div>
+      ${isGas ? '' : `
+        <div class="survey-row"><span>Projected yield</span><span style="color:${tr.mult >= 1.3 ? '#fc8' : tr.mult >= 1 ? '#5fc' : '#aac'}">×${tr.mult.toFixed(2)}</span></div>
+        <div class="survey-row"><span>Settler growth</span><span>${tr.growth ? 'accelerated' : 'standard'}</span></div>
+        <div class="survey-row"><span>Hazard profile</span><span style="color:${tr.risk.startsWith('SEVERE') ? '#f76' : '#bbc'}">${tr.risk}</span></div>`}
+    `;
+  } else {
+    surveyEl.style.display = 'none';
+  }
 
   document.getElementById('op-faction-section').style.display = 'none';
 
@@ -4674,8 +6161,6 @@ function openOrbitPanel(planet) {
 
   if (!hasRocket) return;
 
-  const r = planet.rocket;
-
   // Populate transfer target dropdown with all other planets
   clearTransfer();
   const sel = document.getElementById('op-transfer-target');
@@ -4688,27 +6173,6 @@ function openOrbitPanel(planet) {
       sel.appendChild(opt);
     }
   });
-
-  document.getElementById('op-planet').textContent  = planet.name;
-  document.getElementById('op-sma-cur').textContent = r.a.toFixed(2) + ' u';
-  document.getElementById('op-ecc-cur').textContent = r.e.toFixed(4);
-  document.getElementById('op-inc-cur').textContent = (r.inclination * 180/Math.PI).toFixed(2) + '°';
-  document.getElementById('op-arg-cur').textContent = (r.argPeri     * 180/Math.PI).toFixed(2) + '°';
-  document.getElementById('op-apo-cur').textContent = (r.a*(1+r.e) - r.planetRadius).toFixed(2) + ' u';
-  document.getElementById('op-per-cur').textContent = (r.a*(1-r.e) - r.planetRadius).toFixed(2) + ' u';
-
-  const slSma = document.getElementById('sl-sma');
-  slSma.min   = (r.planetRadius * 1.5).toFixed(2);
-  slSma.max   = (r.a * 4.0).toFixed(2);
-  slSma.step  = (r.a * 0.005).toFixed(3);
-  slSma.value = r.a;
-
-  _syncEccMax(r.a, r.planetRadius);
-  document.getElementById('sl-ecc').value = r.e;
-  document.getElementById('sl-inc').value = (r.inclination * 180/Math.PI).toFixed(2);
-  document.getElementById('sl-arg').value = (r.argPeri     * 180/Math.PI).toFixed(2);
-
-  updateOrbitPanel();
 }
 
 document.getElementById('op-close').addEventListener('click', () => {
@@ -4718,10 +6182,6 @@ document.getElementById('op-close').addEventListener('click', () => {
   _activePlanet = null;
   document.getElementById('orbit-panel').style.display = 'none';
 });
-
-['sl-sma','sl-ecc','sl-inc','sl-arg'].forEach(id =>
-  document.getElementById(id).addEventListener('input', updateOrbitPanel)
-);
 
 document.getElementById('op-transfer-target').addEventListener('change', function () {
   if (!_activePlanet || !this.value) { clearTransfer(); return; }
@@ -4849,19 +6309,12 @@ function launchArmyRocket(sourceColony, targetPlanet, targetType, targetColony, 
   from.rocket = null;
   if (from.sidebarEntry) { const t = from.sidebarEntry.querySelector('.rocket-tag'); if (t) t.remove(); }
 
-  const r1 = from.orbitR, r2 = to.orbitR;
-  const outbound = r1 < r2;
-  const { a, xferTime } = computeTransferWindow(from, to);
-  const c_ = Math.abs(r2 - r1) / 2, b_ = Math.sqrt(r1 * r2);
-  const θ = outbound ? from.angle : from.angle + Math.PI;
-  const snapshotArc = new Float32Array(81 * 3);
-  for (let i = 0; i <= 80; i++) {
-    const t_  = outbound ? (i/80)*Math.PI : Math.PI + (i/80)*Math.PI;
-    const lx  = a * Math.cos(t_) - c_, ly = b_ * Math.sin(t_);
-    snapshotArc[i*3]   = lx * Math.cos(θ) - ly * Math.sin(θ);
-    snapshotArc[i*3+1] = 0;
-    snapshotArc[i*3+2] = lx * Math.sin(θ) + ly * Math.cos(θ);
-  }
+  // Armies depart immediately at any phase angle — fly a powered arc to the
+  // target's predicted arrival position (the old Hohmann snapshot pointed at
+  // the wrong endpoint when launched outside a window).
+  const { xferTime: tHohmann } = computeTransferWindow(from, to);
+  const xferTime = tHohmann * _xferProfile().timeMult;
+  const snapshotArc = buildPoweredArc(from, to, xferTime);
 
   const flightMesh = r.mesh.clone();
   r.mesh.getWorldPosition(flightMesh.position);
@@ -4877,6 +6330,7 @@ function launchArmyRocket(sourceColony, targetPlanet, targetType, targetColony, 
     captureElapsed: 0, captureDuration: 90,
     capturePer: to.radius * 3, captureE0: 0.85,
     plume, progX, progZ, exhaustSpeed,
+    trajLine: _makeTrajLine(snapshotArc),
     mission: armyMission,
   });
 
@@ -4958,10 +6412,12 @@ function _resolveArmyCombat(f) {
 
 document.getElementById('op-establish').addEventListener('click', () => {
   if (!_activePlanet || _activePlanet === homePlanet || colonies.some(c => c.planet === _activePlanet)) return;
+  if (_activePlanet.type === 'gas') return;   // no solid surface
   const newWorld = makeColonyWorld(homeWorld.attrs.transfer_level ?? 0);
   const newColony = { planet: _activePlanet, world: newWorld, playerCooldowns: {}, nextEventTick: 5 };
   newWorld.attrs._colonyEstablishedTick = newWorld.tick;
   newWorld.attrs.miner_pop   = 20;
+  newWorld.attrs.income_mult = COLONY_TRAITS[_activePlanet.type]?.mult ?? 1;
   newWorld.push(new NEvent('mission_success', { source: 'player' }));
   colonies.push(newColony);
   activeColony = newColony;
@@ -5024,113 +6480,8 @@ document.getElementById('btn-control-overlay').addEventListener('click', () => {
 
 document.getElementById('op-xfer-skip').addEventListener('click', skipToWindow);
 document.getElementById('op-xfer-execute').addEventListener('click', executeTransfer);
-
-document.getElementById('op-execute').addEventListener('click', () => {
-  if (!_activePlanet) return;
-  const r = _activePlanet.rocket;
-
-  const a2   = parseFloat(document.getElementById('sl-sma').value);
-  const e2   = Math.min(parseFloat(document.getElementById('sl-ecc').value),
-                        parseFloat(document.getElementById('sl-ecc').max));
-  const inc2 = parseFloat(document.getElementById('sl-inc').value) * Math.PI / 180;
-  const arg2 = parseFloat(document.getElementById('sl-arg').value) * Math.PI / 180;
-
-  const cost = computeManeuverDv(r, a2, e2, inc2, arg2);
-  if (cost > r.deltav - r.usedDV + 1e-9) return;
-
-  r.usedDV += cost;
-  r.a = a2;  r.e = e2;  r.c = a2 * e2;
-  r.b = a2 * Math.sqrt(1 - e2 * e2);
-  r.inclination = inc2;  r.argPeri = arg2;
-
-  r.frame.rotation.y = arg2;
-  r.frame.rotation.x = inc2;
-
-  r.frame.remove(r.orbitRing);
-  r.orbitRing.geometry.dispose();
-  r.orbitRing.material.dispose();
-  r.orbitRing = buildEllipticalOrbitRing(a2, e2);
-  r.orbitRing.visible = showOrbits;
-  r.frame.add(r.orbitRing);
-
-  // Also update speed to stay Keplerian-consistent with new semi-major axis
-  r.speed = Math.sqrt(r.GM / (a2 * a2 * a2));
-
-  clearPreview();
-  clearOsculating();
-  openOrbitPanel(_activePlanet);
-});
-
-document.getElementById('op-capture').addEventListener('click', () => {
-  if (!_activePlanet?.rocket?.osculatingElements) return;
-  const r  = _activePlanet.rocket;
-  const nb = r.nearBody;
-  const el = r.osculatingElements;
-  if (!nb || !el) return;
-
-  const bound = el.e < 1 && el.a > 0;
-  const rPer  = bound ? el.a*(1-el.e) : Math.abs(el.a)*(el.e-1);
-  if (rPer <= nb.radius * 1.05) return;
-
-  const vPer  = Math.sqrt(nb.GM * (2/rPer - 1/el.a));
-  const vCirc = Math.sqrt(nb.GM / rPer);
-  const capDV = Math.abs(vPer - vCirc);
-  if (capDV > r.deltav - r.usedDV + 1e-9) return;
-
-  // Deduct ΔV
-  r.usedDV += capDV;
-
-  // New circular orbit at periapsis of the osculating orbit
-  const newA = rPer, newE = 0;
-  const newInc = el.inclination, newArg = el.argPeri;
-  const newSpeed = Math.sqrt(nb.GM / (newA * newA * newA));
-
-  // Transfer rocket frame from old planet to new one
-  const oldPlanet = _activePlanet;
-  r.frame.removeFromParent();
-  nb.planetNode.add(r.frame);
-
-  // Update rocket properties
-  r.a = newA;  r.e = newE;  r.b = newA;  r.c = 0;
-  r.inclination = newInc;  r.argPeri = newArg;
-  r.speed = newSpeed;
-  r.GM = nb.GM;
-  r.planetRadius = nb.radius;
-  r.angle = 0;  // start at periapsis
-  r.nearBody = null;  r.nearDist = Infinity;  r.osculatingElements = null;
-
-  // Update frame orientation
-  r.frame.rotation.y = newArg;
-  r.frame.rotation.x = newInc;
-
-  // Rebuild orbit ring
-  r.frame.remove(r.orbitRing);
-  r.orbitRing.geometry.dispose();
-  r.orbitRing.material.dispose();
-  r.orbitRing = buildEllipticalOrbitRing(newA, newE);
-  r.orbitRing.visible = showOrbits;
-  r.frame.add(r.orbitRing);
-
-  // Transfer planet.rocket ownership
-  oldPlanet.rocket = null;
-  nb.rocket = r;
-
-  // Update sidebar badges
-  if (oldPlanet.sidebarEntry) {
-    const tag = oldPlanet.sidebarEntry.querySelector('.rocket-tag');
-    if (tag) tag.remove();
-  }
-  if (nb.sidebarEntry && !nb.sidebarEntry.querySelector('.rocket-tag')) {
-    const tag = document.createElement('span');
-    tag.className = 'rocket-tag';
-    tag.textContent = 'SAT';
-    nb.sidebarEntry.appendChild(tag);
-  }
-
-  clearPreview();
-  clearOsculating();
-  _activePlanet = nb;
-  openOrbitPanel(nb);
+document.getElementById('op-xfer-auto').addEventListener('change', function () {
+  _setAutoLaunch(this.checked);
 });
 
 renderer.domElement.addEventListener('mousedown', e => { _mdownX = e.clientX; _mdownY = e.clientY; });
@@ -5150,6 +6501,26 @@ window.addEventListener('resize', () => {
   camera.aspect = innerWidth / innerHeight;
   camera.updateProjectionMatrix();
   renderer.setSize(innerWidth, innerHeight);
+});
+
+// ── Keyboard shortcuts ────────────────────────────────────
+window.addEventListener('keydown', e => {
+  if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT' || e.target.tagName === 'TEXTAREA') return;
+  if (e.code === 'Space') {
+    e.preventDefault();
+    paused = !paused;
+    updateSpeedUI();
+  } else if (e.key === '+' || e.key === '=') {
+    if (simSpeedIdx < SIM_SPEEDS.length - 1) _userSetSpeed(simSpeedIdx + 1);
+  } else if (e.key === '-' || e.key === '_') {
+    if (simSpeedIdx > 0) _userSetSpeed(simSpeedIdx - 1);
+  } else if (e.key === 'l' || e.key === 'L') {
+    document.getElementById('btn-log').click();
+  } else if (e.key === 'f' || e.key === 'F') {
+    document.getElementById('btn-factions').click();
+  } else if (e.key === 'm' || e.key === 'M') {
+    document.getElementById('btn-mute').click();
+  }
 });
 </script>
 </body>

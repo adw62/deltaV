@@ -1,6 +1,38 @@
-# deltaV — Procedural Solar System / Colony Sim
+# ΔV (deltaV) — Procedural Solar System / Colony Sim
 
 A standalone browser game. No build step, no server, no dependencies beyond a CDN Three.js import. Open `index.html` directly.
+
+Found colonies across a procedurally generated solar system, manage money, factions and synthetic labour, and reach a victory before the government, the investors, or your own workforce end you.
+
+## Win / lose conditions
+
+| Outcome | Condition |
+|---|---|
+| **Industrial Titan** (win) | ₡12,000 credits |
+| **Master of the System** (win) | 3+ colonies and 90+ total settlers |
+| **Synthesis** (win) | Synth co-government recognised with miner↔synth alliance ≥ 60% |
+| **Bankruptcy** (lose) | Funds fall to −₡400 |
+| **Charter Revoked** (lose) | Government sanctions reach 5 (unless gov is your puppet) |
+| **Hostile Takeover** (lose) | Investors fully divested *and* hostile for 12 consecutive ticks |
+
+Progress is tracked in the **Directives** widget (top right), which doubles as a getting-started tutorial for new games. Endgame shows a procedural epilogue assembled from the final state of every colony.
+
+## Colony site strategy (`COLONY_TRAITS` in `index.html`)
+
+Planet type matters when choosing where to colonize — an **Orbital Survey** block appears in the panel once a rocket is in orbit:
+
+| Type | Yield | Notes |
+|---|---|---|
+| Volcanic | ×1.50 | 2.2× mining accidents, meltdown risk |
+| Toxic | ×1.35 | 2.2× disease, alien bacteria likely |
+| Desert | ×1.20 | More resource veins, 2× ruins chance |
+| Obsidian | ×1.15 | 2.5× ancient ruins chance |
+| Rocky | ×1.00 | Baseline |
+| Frozen | ×0.95 | Low disease, preserved ruins |
+| Continental / Ocean | ×0.85 / ×0.80 | Population grows ~2× faster |
+| Gas giants | — | Cannot be colonized |
+
+Colony income also scales with a drifting **ore market** (±~40%, shown in the topbar).
 
 ---
 
@@ -43,13 +75,15 @@ A standalone browser game. No build step, no server, no dependencies beyond a CD
 
 ---
 
-## What is NOT yet built (from `GAMEPLAY_PLAN.md`)
+## Polish layer (all in `index.html`)
 
-- **§13 Win/lose conditions** — investor collapse, miner independence declaration, government charter revocation; the factions reach hostile/revolutionary states but nothing happens yet
-- **Terror attack targeting** — `miner_terror_attack` and `sabotage` events exist in `colony_data.js` faction actions but no structure-destruction logic is wired in `index.html`; nuclear plant is flagged as a terror target in its description but not in code
-- **Population counter** — `GAMEPLAY_PLAN.md §5` describes slow population growth tied to life support; referenced in faction preconditions in `colony_data.js` but not implemented
-- **Synth count display** — synths are deployed via player action but the count is not tracked or shown
-- **Rocket explosion visual** — `_spawnExplosionFlash` fires but there is no debris field or persistent damage marker
+- **Win/lose system** — `_checkEndConditions()` runs each tick; `_showEndgame()` renders the overlay; `_buildEpilogue()` assembles per-colony epilogue lines from world attrs
+- **Event toasts** — `_emitToastsFor()` scans new narrative entries each tick; severity sets `_TOAST_GOOD/_TOAST_WARN/_TOAST_DANGER`; faction shift entries colored by target disposition; synth news suppressed pre-reveal (same rule as the log)
+- **Procedural audio** — `AudioSys` (WebAudio, no assets): ambient drone, UI clicks, launch rumble (filtered noise sweep), explosions, window-open alarm, toast pings, victory/defeat stings; `M` or 🔊 toggles mute; starts on first pointer interaction (autoplay policy)
+- **Visuals** — nebula sprite backdrop, additive star-glow sprite, settlement city-lights that grow with colony population (`_updateSettlementVisuals`), explosion debris sparks via the shared particle pool, funds pulse animation
+- **Objectives widget** — `_updateObjectives()`; tutorial checklist until first colony tech-up, then directives mode with win progress bars and lose-condition warnings
+- **Ore market** — `homeWorld.attrs.ore_market`, two overlapping sine cycles, clamped 0.6–1.5, multiplies corporate colony income
+- **Keyboard** — Space pause · +/− speed · L log · F factions · M mute
 
 ---
 
@@ -106,18 +140,54 @@ A standalone browser game. No build step, no server, no dependencies beyond a CD
 
 | Control | Action |
 |---|---|
-| Drag | Orbit camera |
-| Scroll | Zoom |
-| Click planet (sidebar) | Warp and lock camera |
-| Click again / click star | Unlock |
-| **Generate** | Rebuild system from seed |
-| **Random Seed** | New random seed and rebuild |
-| **Orbits** | Toggle orbit rings |
-| **Asteroid Belt** | Toggle asteroid field |
-| **Corona** | Toggle solar particle effect |
-| **◀◀ / ▶▶** | Slower / faster sim speed |
-| **Log** | Open narrative log panel |
-| Click colony planet | Open colony management panel |
+| Drag / Scroll | Orbit camera / zoom |
+| Click planet (scene or sidebar) | Focus camera; HOME/SAT/COL planets open their panel |
+| **System ▾** | Worldgen & display options (seed, planet count, generate, orbits, asteroids, control overlay) |
+| **− / + / ⏸** (or `-` `+` Space) | Sim speed and pause; the speed label turns amber while auto-slowed for a window |
+| **News / Factions / Directives** (or `L` `F`) | Toggle the log, faction, and objectives panels |
+| `M` / 🔊 | Mute |
+
+## Transfer UX
+
+Manual transfers can't be missed: selecting a destination shows the next launch window; **Auto-launch when window opens** arms the rocket to fire itself at alignment (even at 100×), **Skip to Window** jumps time, and an unarmed open window automatically drops the sim to 1× (restoring the previous speed when it closes — manual speed changes during a window cancel the auto-restore). Queued missions on the home planet always auto-launch at their windows. The sim only slows for windows that matter: an open manual-transfer plan or a waiting mission — narrative comms windows never interrupt (dispatches auto-queue). Every in-flight rocket keeps its cyan trajectory line visible for the whole transfer (removed on arrival). The manual orbital-element editor (sliders, Δv budget, burns, SOI capture) was removed — transfers are fully automatic from destination selection. Colony **Actions** are grouped (Workforce / Relations / Synthetics / Security) and situational actions stay hidden until their trigger state exists.
+
+### Propulsion tech and launch windows (`TRANSFER_PROFILES`)
+
+Researching propulsion frees the orbital layer from Hohmann windows, not just the narrative one:
+
+| Level | Launch | Off-window cost | Transit time |
+|---|---|---|---|
+| 0 Hohmann | window only | — | ×1.0 |
+| 1 Reserve Burns | **anytime** | ×1.75 | ×0.9 |
+| 2 Ion Drives | anytime | ×1.4 | ×0.65 |
+| 3 Alien Propulsion | anytime | ×1.15 | ×0.45 |
+| 4 Quantum Relay | anytime | none | ×0.25 |
+
+At level ≥ 1: Launch Now is always enabled (the window row shows "optimal in ~Xs" — launching at the optimal moment still pays base cost, and arming auto-launch waits for it), queued missions **depart immediately**, no window banners or sim slowdowns fire, and flights follow `buildPoweredArc` — a prograde arc swept to the target's *predicted* position at arrival (also used for army launches at every level, fixing the old misaligned-endpoint visual).
+
+## Orbital Bombardment
+
+Orbital weapons are directly fireable: the **Orbital Bombardment** action (Security category, ₡250, 30-tick cooldown) requires a completed weapon stationed at the colony. It kills 4–7 workers, has a 30% chance of levelling a non-core structure, and breaks an active militia 65% of the time (suppressing the miners); the `orbital_strike_miners` event enrages the government (+0.7 hostile) and radicalises survivors on a miss. Visuals: beam lance from the weapon plus the staged nuke flash.
+
+## Event & world visuals (`_fxList` system in `index.html`)
+
+Real-time visual effects driven by narrative events via the `_EVENT_FX` dispatcher (effects run on real clock time, so they look right at any sim speed):
+
+- **Solar flare** — plasma jet erupts from the star with a glow pulse
+- **Meteor strike** — rock streaks in with a glowing trail and impacts the colony
+- **Comet flyby** — sun-grazing comet crosses the system, tail always anti-sunward
+- **Aurora storm** — shimmering polar rings on the colony planet
+- **Nuclear meltdown / mass casualties** — staged white flash, orange shell, lingering surface fire
+- **Orbital strike** — stationed orbital weapons visibly fire a beam at the surface when supporting Crush Miners / Synth Hard Reset (weapons track their target planet)
+- Sabotage, terror attacks and mining accidents flash explosions on the surface
+
+World-generation upgrades: drifting cloud decks on continental/ocean/toxic worlds, drifting band overlays + fast rotation on (oblate) gas giants, banded canvas-textured planetary rings with Cassini gaps, flickering lava emissive, rotating Kessler debris and asteroid belt, and proper multi-part station/weapon models (hub-and-ring station with solar wings; rail-cannon weapon that aims at the planet).
+
+The sun is a layered system: a **seamless equirectangular FBM plasma texture** (`makeStarSurfaceTex` — convection structure, fine granulation, sunspots with penumbra; the old radial-disk texture bunched at one UV point and left black gaps), a counter-rotating additive churn layer on a tilted axis, a pulsing glow sprite, a subtly flickering point light, and corona particles. **Ambient prominences** (`_fxProminence`, every 4–12 s): a cubic-bezier magnetic loop anchored at two surface footpoints with plasma particles flowing along the field line in the star's own palette, plus a faint filament line so it reads at a distance — the radial jet (`_fxSolarFlare`) is reserved for actual solar-flare events. Effects are sized relative to the star/planet radius so they read correctly at gameplay zoom.
+
+Gas giants: both catalog entries use the band+storm `_makeGasTex`, with a translucent banded shimmer layer (`_makeGasOverlayTex`) rotating at a different rate for visible churn, and fast oblate rotation.
+
+Rockets are multi-part (accent band, tapered upper stage, swept fins, open engine bell) with a pulsing nav beacon and flickering idle engine glow — shared materials mean in-flight clones pulse too.
 
 ---
 
